@@ -1,5 +1,20 @@
 # A NEW URANIO
 
+## Things that Prisma does and also Plutonio should
+
+sync schema with any database
+generate migrations
+generate a client
+generate types
+
+## What a simple plutonio could do
+
+sync only with mongodb
+no need for migration
+generate client
+generate types
+
+
 ## Things that URANIO does right now
 
 - It creates relations on a database.
@@ -100,4 +115,44 @@ No Custom bll?
 
 It must work on Serverless Lambda functions.
 
+### Admin
+
+Instead of an web based admin panel, build a native app live Mongo compass,
+Postman, Insomnia, ...
+
+### Keep in mind
+
+Migration
+Serverless
+Terraforma?
+
+Autocomplete typescript types
+
+Prisma migration command
+npx prisma migrate dev --name migration2022-12-03
+
+For each migration updates prisma-client inside @prisma/clients
+
+npm i @prisma/client
+need to be installed
+
+ManyToMany
+OneToMany
+OneToOne
+https://www.youtube.com/watch?v=RebA5J-rlwg
+https://www.prisma.io/docs/concepts/overview/prisma-in-your-stack/is-prisma-an-orm#orm-patterns---active-record-and-data-mapper
+
+### TS Interpreter, type checker
+
+https://satellytes.com/blog/post/typescript-ast-type-checker/
+https://codesandbox.io/s/github/georgiee/typescript-type-checker-beyond-ast?file=/main.ts
+https://github.com/georgiee/typescript-type-checker-beyond-ast
+
+### Tsserver
+
+https://github.com/Microsoft/TypeScript/wiki/Standalone-Server-%28tsserver%29
+
+### Checker
+
+https://basarat.gitbook.io/typescript/overview/checker
 
