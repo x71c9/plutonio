@@ -12,11 +12,15 @@ namespace uranio {
 	export type validation = {
 		
 	}
-	export type id = string
+	
+	// export type key = string & {__type: 'key'}
+	export type key = string
+	
+	export type primary_key = string
 	export type email = string
 	export type unique<T> = T
 	export abstract class Atom {
-		public abstract properties: {[k:string]: any}
+		// public abstract properties: {[k:string]: any}
 	}
 	
 	export type Validation = {
@@ -29,9 +33,28 @@ namespace uranio {
 		reg_ex?: string
 	}
 	
-	export type one_to_one<T,_A_> = T;
-	export type one_to_many<T,_A_> = T;
-	export type many_to_many<T> = T;
+	export type PickSubType<Base, Condition> = Pick<Base, {
+		[Key in keyof Base]: Base[Key] extends Condition ? Key : never
+	}[keyof Base]>;
+	
+	export type OmitSubType<Base, Condition> = Omit<Base, {
+		[Key in keyof Base]: Base[Key] extends Condition ? Key : never
+	}[keyof Base]>;
+	
+	
+	// type ExtractLogAtom<P> = PickSubType<P, {connection: 'log'}>;
+	
+	// type ExtractOptional<P> = PickSubType<P, {optional: true}>;
+	
+	// type ExcludeOptional<P> = OmitSubType<P, {optional: true}>;
+	
+	type keys<T extends Atom> = keyof PickSubType<T, key>
+	
+	// export type one_to_one<T extends Atom,_A_ extends keys<T>> = T | undefined
+	// export type one_to_many<T extends Atom,_A_ extends keys<T>> = T[] | undefined
+	// export type many_to_many<T extends Atom> = T | undefined
+
+	export type relation<T extends Atom, _A_ extends keys<T>> = T | undefined
 	
 	export type Unique<T> = T
 	
@@ -43,13 +66,14 @@ namespace uranio {
 }
 
 export interface User extends uranio.Atom{
-	id: uranio.id
+	id: uranio.primary_key
 	name: string
 	email: uranio.unique<uranio.email>
 	age: number
-	thumb: uranio.one_to_one<Thumb, 'user'>
-	addresses?: uranio.one_to_many<Address[], 'user'>
-	
+	// thumb: uranio.one_to_one<Thumb, 'user'>
+	// addresses: uranio.one_to_many<Address, 'user'>
+	// orders: uranio.one_to_many<Order, 'user'>
+	orders: Order[]
 	contacts: Contact
 	salary: {
 		amount: number
@@ -60,20 +84,30 @@ type Contact = {
 	phone: string
 }
 
+export interface Order extends uranio.Atom {
+	id: uranio.primary_key
+	total: number
+	// user: uranio.key
+	user: uranio.relation<User, 'id'>
+}
+
 export interface Thumb extends uranio.Atom {
 	src: string
-	user: string
+	user: uranio.key
 }
 
 export interface Address extends uranio.Atom{
-	id: uranio.id
+	id: uranio.primary_key
 	street: string
-	city: uranio.many_to_many<City>
+	user: uranio.key
+	// city: uranio.many_to_many<City>
+	city: uranio.relation<City,'id'>
 }
 
 export interface City extends uranio.Atom, uranio.SubAtom{
-	id: uranio.id
+	id: uranio.primary_key
 	name: string
+	address: 
 }
 
 export interface UserValidation extends uranio.Validation{
