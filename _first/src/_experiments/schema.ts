@@ -107,7 +107,7 @@ export interface Address extends uranio.Atom{
 export interface City extends uranio.Atom, uranio.SubAtom{
 	id: uranio.primary_key
 	name: string
-	address: 
+	address: string
 }
 
 export interface UserValidation extends uranio.Validation{

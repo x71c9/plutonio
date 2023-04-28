@@ -1,0 +1,19 @@
+{
+	"name": "plutonio",
+	"version": "1.0.0",
+	"description": "A database-less typescript brack-end framework",
+	"main": "dist/index.js",
+	"repository": "git@github.com:x71c9/plutonio.git",
+	"author": "x71c9 <108585118+x71c9@users.noreply.github.com>",
+	"license": "UNLICENSED",
+	"private": false,
+	"dependencies": {
+		"app-root-path": "^3.1.0"
+	},
+	"devDependencies": {
+		"typescript": "^4.9.3",
+		"nodemon": "^2.0.20",
+		"@types/node": "^18.11.10",
+		"ts-node": "^10.9.1"
+	}
+}

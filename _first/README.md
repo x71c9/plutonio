@@ -1,5 +1,25 @@
 # A NEW URANIO
 
+All the types found in all files defined in `tsconfig.json` that extends
+`uranio.atom` should be syncronized with a collection (model) in MongoDB.
+
+- `plutionio` -> generate client
+
+```typescript
+import {PlutonioClient} from 'plutonio-client';
+
+const plutonio = new PlutonioClient();
+await plutonio.users.find({id: '928032'});
+
+```
+
+
+## Things to do when creating the schema
+
+- required / optional
+- primary ID
+
+
 ## Things that Prisma does and also Plutonio should
 
 sync schema with any database
@@ -12,8 +32,6 @@ generate types
 sync only with mongodb
 no need for migration
 generate client
-generate types
-
 
 ## Things that URANIO does right now
 
@@ -124,7 +142,7 @@ Postman, Insomnia, ...
 
 Migration
 Serverless
-Terraforma?
+Terraform?
 
 Autocomplete typescript types
 
