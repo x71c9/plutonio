@@ -1,124 +1,27 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.PlutonioClient = void 0;
-const mongoose_1 = __importDefault(require("mongoose"));
-const log = __importStar(require("./log/index"));
-class PlutonioClient {
-    constructor() {
-        this.ready_state = 0;
-        this._database_url = process.env.DATABASE_URL || '';
-    }
-    async connect() {
-        this._connection = mongoose_1.default.createConnection(this._database_url);
-        this._connection.on('connecting', () => {
-            this._on_connecting();
-        });
-        this._connection.on('connected', () => {
-            this._on_connected();
-        });
-        this._connection.on('disconnecting', () => {
-            this._on_disconnecting();
-        });
-        this._connection.on('disconnected', () => {
-            this._on_disconnected();
-        });
-        this._connection.on('close', () => {
-            this._on_close();
-        });
-        this._connection.on('reconnected', () => {
-            this._on_reconnected();
-        });
-        this._connection.on('error', (err) => {
-            this._on_error(err);
-        });
-        this._connection.on('reconnectFailed', () => {
-            this._on_reconnect_failed();
-        });
-        this._connection.on('reconnectTries', () => {
-            this._on_reconnect_tries();
-        });
-    }
-    async disconnect() {
-        await mongoose_1.default.disconnect();
-    }
-    _on_connecting() {
-        log.debug(`Connection connecting ...`);
-        if (this._connection) {
-            this.ready_state = this._connection.readyState;
-        }
-    }
-    _on_connected() {
-        log.info(`Connection connected`);
-        if (this._connection) {
-            this.ready_state = this._connection.readyState;
-        }
-    }
-    _on_disconnecting() {
-        log.warn(`Connection disconnecting...`);
-        if (this._connection) {
-            this.ready_state = this._connection.readyState;
-        }
-    }
-    _on_disconnected() {
-        log.warn(`Connection disconnected`);
-        if (this._connection) {
-            this.ready_state = this._connection.readyState;
-        }
-    }
-    _on_close() {
-        log.debug(`Connection closed`);
-        if (this._connection) {
-            this.ready_state = this._connection.readyState;
-        }
-    }
-    _on_reconnected() {
-        log.debug(`Connection reconnected`);
-        if (this._connection) {
-            this.ready_state = this._connection.readyState;
-        }
-    }
-    _on_error(e) {
-        throw e;
-    }
-    _on_reconnect_failed() {
-        log.debug(`Connection reconnectFailed`);
-    }
-    _on_reconnect_tries() {
-        log.debug(`Connection reconnectTries`);
-    }
-}
-exports.PlutonioClient = PlutonioClient;
+const client_1 = require("./client");
+// import mongoose from 'mongoose';
 const main = async () => {
-    console.log(process.env.DATABASE_URL);
-    const plutonio = new PlutonioClient();
-    await plutonio.connect();
+    const plutonio = new client_1.PlutonioClient();
+    const user = await plutonio.user.select({
+    // username: 'uniquename',
+    // first_name: 'first'
+    });
+    console.log(user);
     // await plutonio.disconnect();
+    // const connection = mongoose.createConnection(process.env.DATABASE_URL || '');
+    // const atom_schema_def = {
+    //   id: {
+    //     type: undefined,
+    //     required: is_required,
+    //   }
+    // };
+    // let atom_mongo_schema = new mongoose.Schema(atom_schema_def, {
+    //   versionKey: false,
+    //   strict: false
+    // });
+    // const model = connection.model(atom_mongo_schema);
 };
 main();
 //# sourceMappingURL=index.js.map
