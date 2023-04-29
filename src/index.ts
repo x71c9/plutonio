@@ -10,7 +10,7 @@ const main = async () => {
   });
   console.log(user);
 
-  // await plutonio.disconnect();
+  await plutonio.disconnect();
 
   // const connection = mongoose.createConnection(process.env.DATABASE_URL || '');
   // const atom_schema_def = {

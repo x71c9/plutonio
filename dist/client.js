@@ -146,7 +146,7 @@ function _get_property_definitions(atom_name) {
     const properties_definition = {
         id: {
             type: 'primary',
-            optional: true
+            optional: true,
         },
         username: {
             unique: true,
