@@ -1,14 +1,14 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.PlutonioClient = void 0;
 /**
  *
  * Client class
  *
  */
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.PlutonioClient = void 0;
 const mongoose_1 = __importDefault(require("mongoose"));
 const connection_1 = require("./connection");
 class PlutonioClient extends connection_1.ClientConnection {

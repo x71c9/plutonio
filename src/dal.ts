@@ -11,19 +11,28 @@ export class DataAccessLayer<A extends t.Atom> {
   public atom_name: string;
   private connection: mongoose.Connection;
   private schema: t.AtomSchema;
+  public model: mongoose.Model<mongoose.Document<A>>;
   constructor(params: t.DataAccessLayerParams) {
     this.atom_name = params.atom_name;
     this.connection = params.connection;
     this.schema = params.schema;
     const mongo_schema: mongoose.Schema = _generate_mongo_schema(this.schema);
-    const model: mongoose.Model<mongoose.Document<A>> = this.connection.model<
-      mongoose.Document<A>
-    >(this.atom_name, mongo_schema);
+    this.model = this.connection.model<mongoose.Document<A>>(
+      this.atom_name,
+      mongo_schema
+    );
   }
-  public select(
-    params: t.SelectParams<Atom>,
-    options?: t.SelectOptions<Atom>
-  ): Promise<t.Atom[]> {}
+  public async select(
+    params: t.SelectParams<A>,
+    options?: t.SelectOptions<A>
+  ): Promise<A[]> {
+    const sort = options?.sort ? options.sort : {};
+    const response = await this.model
+      .find(params, null, options)
+      .sort(sort)
+      .lean<A[]>();
+    return response;
+  }
   public get(id: string): Promise<t.Atom> {}
   public insert(atom: t.Shape<Atom>): Promise<t.Atom> {}
   public update(
