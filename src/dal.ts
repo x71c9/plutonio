@@ -49,9 +49,8 @@ export class DataAccessLayer<A extends t.Atom> {
       $set: partial_atom,
       $unset: $unset,
     };
-    // TODO: find primary key
     const atom = await this.model.findByIdAndUpdate<A>(
-      {id: id},
+      {_id: id},
       update,
       default_options
     );
@@ -198,7 +197,9 @@ function _clean_atom<A extends t.Atom>(atom: A): A {
     delete (atom as any).__v;
   }
   atom._id = atom._id.toString();
-  return atom;
+  // TODO: better clone
+  const atom_obj = JSON.parse(JSON.stringify(atom));
+  return atom_obj;
 }
 
 function _find_unsets<A extends t.Atom>(_partial_atom: Partial<t.Shape<A>>) {

@@ -44,8 +44,7 @@ class DataAccessLayer {
             $set: partial_atom,
             $unset: $unset,
         };
-        // TODO: find primary key
-        const atom = await this.model.findByIdAndUpdate({ id: id }, update, default_options);
+        const atom = await this.model.findByIdAndUpdate({ _id: id }, update, default_options);
         if (!atom) {
             throw new Error('404');
         }
@@ -59,9 +58,7 @@ class DataAccessLayer {
         return _clean_atom(atom);
     }
     async count(params) {
-        const count_number = await this.model
-            .countDocuments(params)
-            .lean();
+        const count_number = await this.model.countDocuments(params).lean();
         return count_number;
     }
 }
@@ -164,7 +161,9 @@ function _clean_atom(atom) {
         delete atom.__v;
     }
     atom._id = atom._id.toString();
-    return atom;
+    // TODO: better clone
+    const atom_obj = JSON.parse(JSON.stringify(atom));
+    return atom_obj;
 }
 function _find_unsets(_partial_atom) {
     const unsets = {};
