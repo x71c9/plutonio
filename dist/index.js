@@ -7,7 +7,7 @@ const main = async () => {
     console.log('INSERT');
     const response_insert = await plutonio.user.insert({
         username: 'unique2',
-        first_name: 'A'
+        first_name: 'A',
     });
     console.log(response_insert);
     // console.log('UPDATE');
