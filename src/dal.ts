@@ -86,6 +86,8 @@ function _create_model<A extends t.Atom>(
 }
 
 function _generate_mongo_schema(atom_name: string): mongoose.Schema {
+  if (!(atom_name in atom_schemas)) {
+  }
   const atom_schema = atom_schemas[atom_name];
   // TODO: fail if not found
   const atom_schema_def = _generate_mongo_schema_definition(atom_schema);

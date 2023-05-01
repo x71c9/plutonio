@@ -118,3 +118,9 @@ export interface User extends plutonio.atom {
 //   id: '' as plutonio.primary,
 //   age: 0
 // }
+
+export namespace Reference {
+  export type AReference = {
+    whatever: number;
+  };
+}

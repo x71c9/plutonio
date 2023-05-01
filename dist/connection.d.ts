@@ -1,10 +1,10 @@
 import mongoose from 'mongoose';
-export declare class ClientConnection {
+export declare class ConnectionClient {
     connection_ready_state: number;
     private _database_url;
     protected _connection: mongoose.Connection | undefined;
     constructor();
-    connect(): Promise<void>;
+    connect(): mongoose.Connection;
     disconnect(): Promise<void>;
     private _on_connecting;
     private _on_connected;

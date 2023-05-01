@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 import * as log from './log/index';
 
-export class ClientConnection {
+export class ConnectionClient {
   public connection_ready_state: number;
   private _database_url: string;
   protected _connection: mongoose.Connection | undefined;
@@ -11,7 +11,10 @@ export class ClientConnection {
     this.connection_ready_state = 0;
     this._database_url = process.env.DATABASE_URL || '';
   }
-  async connect(): Promise<void> {
+  connect(): mongoose.Connection {
+    if (this._connection) {
+      return this._connection;
+    }
     log.trace(`Connecting...`);
     this._connection = mongoose.createConnection(this._database_url);
     this._connection.on('connecting', () => {
@@ -41,6 +44,7 @@ export class ClientConnection {
     this._connection.on('reconnectTries', () => {
       this._on_reconnect_tries();
     });
+    return this._connection;
   }
   async disconnect(): Promise<void> {
     await mongoose.disconnect();

@@ -69,6 +69,8 @@ function _create_model(params) {
     return model;
 }
 function _generate_mongo_schema(atom_name) {
+    if (!(atom_name in atoms_1.atom_schemas)) {
+    }
     const atom_schema = atoms_1.atom_schemas[atom_name];
     // TODO: fail if not found
     const atom_schema_def = _generate_mongo_schema_definition(atom_schema);

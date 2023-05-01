@@ -9,8 +9,8 @@ import * as t from './types';
 export const atom_schemas: t.AtomSchemas = {
   user: {
     username: {
-      unique: true,
       type: 'string',
+      unique: true,
     },
     first_name: {
       type: 'string',

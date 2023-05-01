@@ -3,10 +3,10 @@
  * Client class
  *
  */
-import { ClientConnection } from './connection';
+import { ConnectionClient } from './connection';
 import { DataAccessLayer } from './dal';
 import { User } from './types';
-export declare class PlutonioClient extends ClientConnection {
+export declare class PlutonioClient extends ConnectionClient {
     user: DataAccessLayer<User>;
     constructor();
 }

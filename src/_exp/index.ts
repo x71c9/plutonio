@@ -1,8 +1,8 @@
 import {PlutonioClient} from './client';
 
-// import mongoose from 'mongoose';
+import {generate_schemas} from './parser';
 
-const main = async () => {
+export const main = async () => {
   const plutonio = new PlutonioClient();
 
   console.log('INSERT');
@@ -35,4 +35,15 @@ const main = async () => {
   await plutonio.disconnect();
 };
 
-main();
+// main();
+
+export const parse = async () => {
+  const atom_schemas = generate_schemas();
+  console.log(atom_schemas);
+};
+
+parse();
+
+// export * from './linter';
+
+// export * from './program';

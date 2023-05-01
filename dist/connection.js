@@ -26,16 +26,19 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ClientConnection = void 0;
+exports.ConnectionClient = void 0;
 const mongoose_1 = __importDefault(require("mongoose"));
 const log = __importStar(require("./log/index"));
-class ClientConnection {
+class ConnectionClient {
     constructor() {
         log.trace(`Initializing Plutonio...`);
         this.connection_ready_state = 0;
         this._database_url = process.env.DATABASE_URL || '';
     }
-    async connect() {
+    connect() {
+        if (this._connection) {
+            return this._connection;
+        }
         log.trace(`Connecting...`);
         this._connection = mongoose_1.default.createConnection(this._database_url);
         this._connection.on('connecting', () => {
@@ -65,6 +68,7 @@ class ClientConnection {
         this._connection.on('reconnectTries', () => {
             this._on_reconnect_tries();
         });
+        return this._connection;
     }
     async disconnect() {
         await mongoose_1.default.disconnect();
@@ -115,5 +119,5 @@ class ClientConnection {
         log.debug(`Reconnect Tries`);
     }
 }
-exports.ClientConnection = ClientConnection;
+exports.ConnectionClient = ConnectionClient;
 //# sourceMappingURL=connection.js.map

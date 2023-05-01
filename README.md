@@ -10,15 +10,16 @@ import {PlutonioClient} from 'plutonio-client';
 
 const plutonio = new PlutonioClient();
 await plutonio.users.find({id: '928032'});
-
 ```
 
+## Using Typescript typeCheker
+
+https://github.com/microsoft/TypeScript/wiki/Using-the-Compiler-API
 
 ## Things to do when creating the schema
 
 - required / optional
 - primary ID
-
 
 ## Things that Prisma does and also Plutonio should
 
@@ -114,11 +115,12 @@ const books = await uranio.book.find({author: 'Pippo'});
 
 It doesn't need `uranio-cli`? How creates the relations?
 If you run:
+
 ```
 uranio.init();
 ```
-Can it look for types? Maybe in a certain directory?
 
+Can it look for types? Maybe in a certain directory?
 
 ```
 const books = await uranio.find('book', {author: 'Pippo'});
@@ -173,4 +175,3 @@ https://github.com/Microsoft/TypeScript/wiki/Standalone-Server-%28tsserver%29
 ### Checker
 
 https://basarat.gitbook.io/typescript/overview/checker
-

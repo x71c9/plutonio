@@ -47,4 +47,9 @@ export interface User extends plutonio.atom {
     last_name?: string;
     age?: number;
 }
+export declare namespace Reference {
+    type AReference = {
+        whatever: number;
+    };
+}
 export {};

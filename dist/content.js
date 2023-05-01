@@ -1,8 +1,8 @@
 "use strict";
 /**
  *
- * Types module
+ * Content
  *
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-//# sourceMappingURL=types.js.map
+//# sourceMappingURL=content.js.map
