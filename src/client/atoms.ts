@@ -4,7 +4,7 @@
  *
  */
 
-import * as t from './types';
+import * as t from '../generate/index';
 
 export const atom_schemas: t.AtomSchemas = {
   user: {

@@ -5,7 +5,7 @@
  */
 
 import * as t from '../client/types';
-import chalk from 'chalk';
+// import chalk from 'chalk';
 
 export type MyType = {
   hello: string;
@@ -23,7 +23,8 @@ export interface MyInterface {
   what: mynamespace.myexport;
 }
 
-export interface User extends t.plutonio.atom, MyInterface, chalk.ColorSupport {
+// export interface User extends t.plutonio.atom, MyInterface, chalk.ColorSupport {
+export interface User extends t.plutonio.atom, MyInterface {
   username: t.plutonio.unique<string>;
   first_name?: string;
   last_name?: string;

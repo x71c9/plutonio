@@ -52,28 +52,9 @@ export type QueryOptions<A extends Atom> = {
   skip?: number;
 };
 
-export type AtomSchemaAttributeType =
-  | 'primary'
-  | 'string'
-  | 'number'
-  | 'boolean';
-
-export type AtomSchemaAttribute = {
-  type: AtomSchemaAttributeType;
-  optional?: boolean;
-  unique?: boolean;
-};
-export type AtomSchema = {
-  [k: string]: AtomSchemaAttribute;
-};
-
 export type DataAccessLayerParams = {
   atom_name: string;
   connection: mongoose.Connection;
-};
-
-export type AtomSchemas = {
-  [k: string]: AtomSchema;
 };
 
 /**

@@ -8,16 +8,18 @@ import {atom_schemas} from './atoms';
 
 import mongoose from 'mongoose';
 
-import * as t from './types';
+import * as client_types from './types';
 
-export class DataAccessLayer<A extends t.Atom> {
+import * as t from '../generate/index';
+
+export class DataAccessLayer<A extends client_types.Atom> {
   public model: mongoose.Model<mongoose.Document<A>>;
-  constructor(params: t.DataAccessLayerParams) {
+  constructor(params: client_types.DataAccessLayerParams) {
     this.model = _create_model(params);
   }
   public async select(
-    params: t.QueryParams<A>,
-    options?: t.QueryOptions<A>
+    params: client_types.QueryParams<A>,
+    options?: client_types.QueryOptions<A>
   ): Promise<A[]> {
     const sort = options?.sort ? options.sort : {};
     const atoms = await this.model
@@ -33,7 +35,7 @@ export class DataAccessLayer<A extends t.Atom> {
     }
     return _clean_atom(atom);
   }
-  public async insert(shape: t.Shape<A>): Promise<A> {
+  public async insert(shape: client_types.Shape<A>): Promise<A> {
     const mon_model = new this.model(shape);
     const mon_res_doc = await mon_model.save();
     const atom = mon_res_doc.toObject() as A;
@@ -41,7 +43,7 @@ export class DataAccessLayer<A extends t.Atom> {
   }
   public async update(
     id: string,
-    partial_atom: Partial<t.Shape<A>>
+    partial_atom: Partial<client_types.Shape<A>>
   ): Promise<A> {
     const default_options: mongoose.QueryOptions = {new: true, lean: true};
     const $unset = _find_unsets(partial_atom);
@@ -67,14 +69,14 @@ export class DataAccessLayer<A extends t.Atom> {
     }
     return _clean_atom(atom);
   }
-  public async count(params: t.QueryParams<A>): Promise<number> {
+  public async count(params: client_types.QueryParams<A>): Promise<number> {
     const count_number = await this.model.countDocuments(params).lean<number>();
     return count_number;
   }
 }
 
-function _create_model<A extends t.Atom>(
-  params: t.DataAccessLayerParams
+function _create_model<A extends client_types.Atom>(
+  params: client_types.DataAccessLayerParams
 ): mongoose.Model<mongoose.Document<A>> {
   const mongo_schema: mongoose.Schema = _generate_mongo_schema(
     params.atom_name
@@ -150,9 +152,12 @@ function _generate_mongoose_schema_type_options(
     case 'boolean': {
       return _generate_boolean_schema_options(schema_type_options);
     }
-    default: {
-      throw new Error('type not found');
+    case 'object': {
+      return _generate_object_schema_options(schema_type_options);
     }
+    // default: {
+    //   throw new Error('type not found');
+    // }
   }
 }
 
@@ -187,7 +192,17 @@ function _generate_boolean_schema_options(
   return schema_type_options;
 }
 
-function _clean_atoms<A extends t.Atom>(atoms: A[]): A[] {
+function _generate_object_schema_options(
+  schema_type_options: mongoose.SchemaTypeOptions<any>
+): mongoose.SchemaTypeOptions<Object> {
+  schema_type_options = {
+    ...schema_type_options,
+    type: Object,
+  };
+  return schema_type_options;
+}
+
+function _clean_atoms<A extends client_types.Atom>(atoms: A[]): A[] {
   const cleaned_atoms: A[] = [];
   for (const atom of atoms) {
     cleaned_atoms.push(_clean_atom(atom));
@@ -195,7 +210,7 @@ function _clean_atoms<A extends t.Atom>(atoms: A[]): A[] {
   return cleaned_atoms;
 }
 
-function _clean_atom<A extends t.Atom>(atom: A): A {
+function _clean_atom<A extends client_types.Atom>(atom: A): A {
   if ('__v' in atom) {
     delete (atom as any).__v;
   }
@@ -205,7 +220,9 @@ function _clean_atom<A extends t.Atom>(atom: A): A {
   return atom_obj;
 }
 
-function _find_unsets<A extends t.Atom>(_partial_atom: Partial<t.Shape<A>>) {
+function _find_unsets<A extends client_types.Atom>(
+  _partial_atom: Partial<client_types.Shape<A>>
+) {
   const unsets = {};
   // const type_atom_props = atm_keys.get_bond(atom_name);
   // for(const [prop, value] of Object.entries(partial_atom)){
@@ -216,7 +233,9 @@ function _find_unsets<A extends t.Atom>(_partial_atom: Partial<t.Shape<A>>) {
   return unsets;
 }
 
-function _clean_unset<A extends t.Atom>(partial_atom: Partial<t.Shape<A>>) {
+function _clean_unset<A extends client_types.Atom>(
+  partial_atom: Partial<client_types.Shape<A>>
+) {
   // const type_atom_props = atm_keys.get_bond(atom_name);
   // for(const [prop, value] of Object.entries(partial_atom)){
   //   if(type_atom_props.has(prop as keyof Partial<schema.AtomShape<A>>) && value === ''){

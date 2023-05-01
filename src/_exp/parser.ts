@@ -5,6 +5,7 @@
  */
 
 import ts from 'typescript';
+// import path from 'path';
 
 // const file_content = fs.readFileSync(`${root}/src/schema.ts`);
 // const node = ts.createSourceFile(
@@ -23,17 +24,42 @@ import ts from 'typescript';
 // })
 
 export const generate_schemas = () => {
-  const program: ts.Program = ts.createProgram([`./src/content.ts`], {});
+  const program: ts.Program = ts.createProgram([`./src/_exp/content.ts`], {});
+  // const program: ts.Program = ts.createProgram([`./src/log/index.ts`], {});
+
+  // const tsconfig_path = `./tsconfig.json`;
+  // const config_file = ts.readConfigFile(tsconfig_path, ts.sys.readFile);
+  // const config_object = config_file.config;
+  // const parse_result = ts.parseJsonConfigFileContent(
+  //   config_object,
+  //   ts.sys,
+  //   path.dirname(tsconfig_path)
+  // );
+  // const compilerOptions = parse_result.options;
+  // const rootNames = parse_result.fileNames;
+  // const create_program_options = {
+  //   rootNames: rootNames,
+  //   options: compilerOptions,
+  // };
+  // const program = ts.createProgram(create_program_options);
 
   const checker: ts.TypeChecker = program.getTypeChecker();
+  // console.log(checker.typeToString);
 
-  const mySourceFile = program.getSourceFile(`./src/content.ts`);
+  const mySourceFile = program.getSourceFile(`./src/_exp/content.ts`);
+  // const mySourceFile = program.getSourceFile(`./src/log/index.ts`);
   if (!mySourceFile) {
     throw new Error(`Cannot find source file`);
   }
 
   // console.log(checker);
 
+  const mySourceFiles = program.getSourceFiles();
+  for (let i = 0; i < mySourceFiles.length; i++) {
+    // console.log(i, mySourceFiles[i].fileName);
+  }
+
+  // ts.forEachChild(mySourceFiles[137], (node) => {
   ts.forEachChild(mySourceFile, (node) => {
     if (ts.isInterfaceDeclaration(node)) {
       const node_type = checker.getTypeAtLocation(node.name);
