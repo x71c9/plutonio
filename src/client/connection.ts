@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-import * as log from './log/index';
+import * as log from '../log/index';
 
 export class ConnectionClient {
   public connection_ready_state: number;

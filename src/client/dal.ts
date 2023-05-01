@@ -4,8 +4,9 @@
  *
  */
 
-import mongoose from 'mongoose';
 import {atom_schemas} from './atoms';
+
+import mongoose from 'mongoose';
 
 import * as t from './types';
 

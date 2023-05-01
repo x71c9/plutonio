@@ -1,4 +1,4 @@
-import {PlutonioClient} from './client';
+import {PlutonioClient} from '../client/client';
 
 import {generate_schemas} from './parser';
 

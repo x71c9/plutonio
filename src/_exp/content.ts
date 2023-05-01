@@ -4,7 +4,7 @@
  *
  */
 
-import * as t from './types';
+import * as t from '../client/types';
 import chalk from 'chalk';
 
 export type MyType = {
