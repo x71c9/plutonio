@@ -7,6 +7,10 @@
   "author": "x71c9 <108585118+x71c9@users.noreply.github.com>",
   "license": "UNLICENSED",
   "private": false,
+  "bin": {
+    "plutonio": "dist/sh.js",
+    "plt": "dist/sh.js"
+  },
   "scripts": {
     "precommit": "yarn lint-staged --allow-empty",
     "prepare": "yarn husky install .config/husky && yarn husky set .config/husky/pre-commit \"yarn precommit\"",
@@ -48,6 +52,7 @@
   },
   "dependencies": {
     "chalk": "4",
+    "commander": "^10.0.1",
     "dotenv": "^16.0.3",
     "mongoose": "^7.1.0"
   }

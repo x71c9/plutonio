@@ -3,4 +3,7 @@
  * Index module
  *
  */
-export {};
+export type unique<T> = T;
+export type atom = {
+    _id: string;
+};

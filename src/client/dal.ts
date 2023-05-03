@@ -12,6 +12,10 @@ import * as client_types from './types';
 
 import * as t from '../generate/index';
 
+// export namespace dal {
+export type unique<A> = A;
+// }
+
 export class DataAccessLayer<A extends client_types.Atom> {
   public model: mongoose.Model<mongoose.Document<A>>;
   constructor(params: client_types.DataAccessLayerParams) {
@@ -152,9 +156,9 @@ function _generate_mongoose_schema_type_options(
     case 'boolean': {
       return _generate_boolean_schema_options(schema_type_options);
     }
-    case 'object': {
-      return _generate_object_schema_options(schema_type_options);
-    }
+    // case 'object': {
+    //   return _generate_object_schema_options(schema_type_options);
+    // }
     // default: {
     //   throw new Error('type not found');
     // }
@@ -192,15 +196,15 @@ function _generate_boolean_schema_options(
   return schema_type_options;
 }
 
-function _generate_object_schema_options(
-  schema_type_options: mongoose.SchemaTypeOptions<any>
-): mongoose.SchemaTypeOptions<Object> {
-  schema_type_options = {
-    ...schema_type_options,
-    type: Object,
-  };
-  return schema_type_options;
-}
+// function _generate_object_schema_options(
+//   schema_type_options: mongoose.SchemaTypeOptions<any>
+// ): mongoose.SchemaTypeOptions<Object> {
+//   schema_type_options = {
+//     ...schema_type_options,
+//     type: Object,
+//   };
+//   return schema_type_options;
+// }
 
 function _clean_atoms<A extends client_types.Atom>(atoms: A[]): A[] {
   const cleaned_atoms: A[] = [];

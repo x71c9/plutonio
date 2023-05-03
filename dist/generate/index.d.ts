@@ -7,7 +7,7 @@ export declare const atom_heritage_clause = "plutonio.atom";
 export type GenerateOptions = {
     tsconfig_path?: string;
 };
-export type AtomSchemaAttributeType = 'string' | 'number' | 'boolean' | 'object';
+export type AtomSchemaAttributeType = 'string' | 'number' | 'boolean';
 export type AtomSchemaAttribute = {
     type: AtomSchemaAttributeType;
     optional?: boolean;

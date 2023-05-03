@@ -11,6 +11,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.DataAccessLayer = void 0;
 const atoms_1 = require("./atoms");
 const mongoose_1 = __importDefault(require("mongoose"));
+// }
 class DataAccessLayer {
     constructor(params) {
         this.model = _create_model(params);
@@ -124,9 +125,9 @@ function _generate_mongoose_schema_type_options(atom_schema_attribute) {
         case 'boolean': {
             return _generate_boolean_schema_options(schema_type_options);
         }
-        case 'object': {
-            return _generate_object_schema_options(schema_type_options);
-        }
+        // case 'object': {
+        //   return _generate_object_schema_options(schema_type_options);
+        // }
         // default: {
         //   throw new Error('type not found');
         // }
@@ -154,13 +155,15 @@ function _generate_boolean_schema_options(schema_type_options) {
     };
     return schema_type_options;
 }
-function _generate_object_schema_options(schema_type_options) {
-    schema_type_options = {
-        ...schema_type_options,
-        type: Object,
-    };
-    return schema_type_options;
-}
+// function _generate_object_schema_options(
+//   schema_type_options: mongoose.SchemaTypeOptions<any>
+// ): mongoose.SchemaTypeOptions<Object> {
+//   schema_type_options = {
+//     ...schema_type_options,
+//     type: Object,
+//   };
+//   return schema_type_options;
+// }
 function _clean_atoms(atoms) {
     const cleaned_atoms = [];
     for (const atom of atoms) {
