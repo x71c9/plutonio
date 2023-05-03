@@ -167,8 +167,9 @@ function _map_type(checker, type) {
     }
     else if (type.isUnion()) {
         const types = type.types.map((t) => _map_type(checker, t));
-        const defined_types = types.filter(t => t !== undefined);
-        if (defined_types.length > 1 && !defined_types.every(t => t === defined_types[0])) {
+        const defined_types = types.filter((t) => t !== undefined);
+        if (defined_types.length > 1 &&
+            !defined_types.every((t) => t === defined_types[0])) {
             throw new Error(`Union of different types is not allowed`);
         }
         if (defined_types.length === 0) {
@@ -181,8 +182,8 @@ function _map_type(checker, type) {
 function _is_array_type(type) {
     var _a, _b;
     if (type.isUnion()) {
-        const is_array_types = type.types.map(t => _is_array_type(t));
-        const count = is_array_types.reduce((acc, curr) => curr ? acc + 1 : acc, 0);
+        const is_array_types = type.types.map((t) => _is_array_type(t));
+        const count = is_array_types.reduce((acc, curr) => (curr ? acc + 1 : acc), 0);
         if (count > is_array_types.length - 2) {
             return true;
         }
