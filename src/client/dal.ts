@@ -12,10 +12,6 @@ import * as client_types from './types';
 
 import * as t from '../generate/index';
 
-// export namespace dal {
-export type unique<A> = A;
-// }
-
 export class DataAccessLayer<A extends client_types.Atom> {
   public model: mongoose.Model<mongoose.Document<A>>;
   constructor(params: client_types.DataAccessLayerParams) {
@@ -140,60 +136,46 @@ function _generate_mongoose_schema_type_options(
     };
   }
   switch (atom_schema_attribute.type) {
-    // case 'primary': {
-    //   schema_type_options = {
-    //     ...schema_type_options,
-    //     type: mongoose.Schema.Types.ObjectId,
-    //   };
-    //   return schema_type_options;
-    // }
     case 'string': {
-      return _generate_string_schema_options(schema_type_options);
+      schema_type_options = {
+        ...schema_type_options,
+        type: atom_schema_attribute.array === true ? [String] : String,
+        trim: true,
+      };
+      return schema_type_options;
     }
     case 'number': {
-      return _generate_number_schema_options(schema_type_options);
+      schema_type_options = {
+        ...schema_type_options,
+        type: atom_schema_attribute.array === true ? [Number] : Number,
+      };
+      return schema_type_options;
     }
     case 'boolean': {
-      return _generate_boolean_schema_options(schema_type_options);
+      schema_type_options = {
+        ...schema_type_options,
+        type: atom_schema_attribute.array === true ? [Boolean] : Boolean,
+      };
+      return schema_type_options;
     }
-    // case 'object': {
-    //   return _generate_object_schema_options(schema_type_options);
-    // }
-    // default: {
-    //   throw new Error('type not found');
-    // }
+    case 'date': {
+      schema_type_options = {
+        ...schema_type_options,
+        type: atom_schema_attribute.array === true ? [Date] : Date,
+      };
+      return schema_type_options;
+    }
+    case 'any': {
+      schema_type_options = {
+        ...schema_type_options,
+        type:
+          atom_schema_attribute.array === true
+            ? [mongoose.Schema.Types.Mixed]
+            : mongoose.Schema.Types.Mixed,
+      };
+      return schema_type_options;
+    }
   }
-}
-
-function _generate_string_schema_options(
-  schema_type_options: mongoose.SchemaTypeOptions<any>
-): mongoose.SchemaTypeOptions<string> {
-  schema_type_options = {
-    ...schema_type_options,
-    type: String,
-    trim: true,
-  };
-  return schema_type_options;
-}
-
-function _generate_number_schema_options(
-  schema_type_options: mongoose.SchemaTypeOptions<any>
-): mongoose.SchemaTypeOptions<number> {
-  schema_type_options = {
-    ...schema_type_options,
-    type: Number,
-  };
-  return schema_type_options;
-}
-
-function _generate_boolean_schema_options(
-  schema_type_options: mongoose.SchemaTypeOptions<any>
-): mongoose.SchemaTypeOptions<number> {
-  schema_type_options = {
-    ...schema_type_options,
-    type: Boolean,
-  };
-  return schema_type_options;
 }
 
 // function _generate_object_schema_options(

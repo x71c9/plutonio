@@ -5,7 +5,6 @@
  */
 import mongoose from 'mongoose';
 import * as client_types from './types';
-export type unique<A> = A;
 export declare class DataAccessLayer<A extends client_types.Atom> {
     model: mongoose.Model<mongoose.Document<A>>;
     constructor(params: client_types.DataAccessLayerParams);

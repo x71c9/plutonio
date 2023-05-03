@@ -128,8 +128,13 @@ function _generate_atom_schema(checker, interf, plutonio_name) {
 function _generate_atom_schema_attribute(checker, interf, property, plutonio_name) {
     const property_type = checker.getTypeOfSymbolAtLocation(property, interf);
     const mapped_type = _map_type(checker, property_type);
+    const type_string = checker.typeToString(property_type);
+    // console.log("g", type_string);
+    if (!mapped_type) {
+        throw new Error(`Invalid Plutonio attribute type '${type_string}'`);
+    }
     const atom_schema_attribute = {
-        type: mapped_type
+        type: mapped_type,
     };
     if (_has_undefined(property_type)) {
         atom_schema_attribute.optional = true;
@@ -137,37 +142,53 @@ function _generate_atom_schema_attribute(checker, interf, property, plutonio_nam
     if (_atom_schema_attribute_is_unique(checker, property, plutonio_name)) {
         atom_schema_attribute.unique = true;
     }
+    if (_is_array_type(property_type)) {
+        atom_schema_attribute.array = true;
+    }
     return atom_schema_attribute;
 }
 function _map_type(checker, type) {
     const type_string = checker.typeToString(type);
     const removed_undefined = type_string.replaceAll(' | undefined', '');
-    switch (removed_undefined) {
-        case 'string': {
-            return 'string';
-        }
-        case 'number': {
-            return 'number';
-        }
-        case 'boolean': {
-            return 'boolean';
-        }
+    const removed_array_brackets = removed_undefined
+        .replaceAll('[', '')
+        .replaceAll(']', '');
+    const lower_removed_undefined = removed_array_brackets.toLowerCase();
+    // console.log("map", type_string, removed_undefined, removed_array_brackets, lower_removed_undefined);
+    if (lower_removed_undefined in c.primitive_types) {
+        // string, number, boolean, date
+        return lower_removed_undefined;
     }
-    if (type.isStringLiteral()) { // attribute: "OK"
+    if (type.isStringLiteral()) {
         return 'string';
     }
-    else if (type.isNumberLiteral()) { // attribute: 11
+    else if (type.isNumberLiteral()) {
         return 'number';
     }
     else if (type.isUnion()) {
-        const types = type.types.map(t => _map_type(checker, t));
-        if (types.every(t => c.primitive_types.includes(t))) {
-            return types.includes('string') ? 'string' : 'number';
+        const types = type.types.map((t) => _map_type(checker, t));
+        const defined_types = types.filter(t => t !== undefined);
+        if (defined_types.length > 1 && !defined_types.every(t => t === defined_types[0])) {
+            throw new Error(`Union of different types is not allowed`);
         }
-        // } else if (c.primitive_types.includes(type.flags.toString())) {
-        //   return type.flags.toString();
+        if (defined_types.length === 0) {
+            return undefined;
+        }
+        return defined_types[0];
     }
-    throw new Error(`Invalid Plutonio attribute type '${removed_undefined}'`);
+    return undefined;
+}
+function _is_array_type(type) {
+    var _a, _b;
+    if (type.isUnion()) {
+        const is_array_types = type.types.map(t => _is_array_type(t));
+        const count = is_array_types.reduce((acc, curr) => curr ? acc + 1 : acc, 0);
+        if (count > is_array_types.length - 2) {
+            return true;
+        }
+    }
+    const value_declaration_text = (_b = (_a = type.getSymbol()) === null || _a === void 0 ? void 0 : _a.valueDeclaration) === null || _b === void 0 ? void 0 : _b.getText();
+    return (value_declaration_text === null || value_declaration_text === void 0 ? void 0 : value_declaration_text.includes('ArrayConstructor')) === true;
 }
 function _has_undefined(type) {
     if (type.isUnion() && type.types.some(_has_undefined)) {
