@@ -16,6 +16,12 @@ await plutonio.users.find({id: '928032'});
 
 https://github.com/microsoft/TypeScript/wiki/Using-the-Compiler-API
 
+## OpenAPI from typescript
+
+https://www.highlight.io/blog/auto-generating-open-api-documents-with-type-script-interfaces
+
+https://tsoa-community.github.io/docs/getting-started.html
+
 ## Things to do when creating the schema
 
 - required / optional
