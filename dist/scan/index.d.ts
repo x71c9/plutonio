@@ -21,4 +21,28 @@ export type AtomSchema = {
 export type AtomSchemas = {
     [k: string]: AtomSchema;
 };
-export declare function scan(options?: GenerateOptions): void;
+type Import = {
+    text: string;
+    module: string;
+    clause?: string;
+};
+type Type = {
+    text: string;
+    name: string;
+    properties: Property[];
+};
+type Interface = Type;
+type Property = {
+    name: string;
+    value: string;
+    type: string;
+    optional?: boolean;
+};
+type SourceFileSchema = {
+    imports: Import[];
+    types: Type[];
+    interfaces: Interface[];
+};
+export declare function scan(options?: GenerateOptions): Map<string, SourceFileSchema>;
+export declare function printObjectWithCircular(obj: any, maxDepth?: number, currentDepth?: number, seen?: Set<any>, indent?: number): void;
+export {};

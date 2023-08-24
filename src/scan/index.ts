@@ -63,13 +63,14 @@ type SourceFileSchema = {
 // const valid_kind_name = ['InterfaceDeclaration', 'TypeAliasDeclaration'];
 
 export function scan(options?: GenerateOptions) {
-  log.trace('Generating...');
+  log.trace('Scanning...');
   const {program, checker} = _create_ts_program(options);
   const schemas = _scan_all_files(program, checker);
   for (const [key, schema] of schemas) {
     console.log(key);
     log.info(schema);
   }
+  return schemas;
 }
 
 function _scan_all_files(program: ts.Program, checker: ts.TypeChecker) {
@@ -151,7 +152,9 @@ function _generate_properties(
   type_node: ts.TypeAliasDeclaration | ts.InterfaceDeclaration
 ): Property[] {
   const type = checker.getTypeAtLocation(type_node);
+  // console.log(type);
   const node_properties = type.getProperties();
+  // console.log(node_properties);
   const properties: Property[] = [];
   for (const node_property of node_properties) {
     const property = _generate_property(checker, node_property, type_node);
@@ -166,8 +169,11 @@ function _generate_property(
   node: ts.Node
 ): Property {
   const name = node_property.getName();
-  const value = _get_property_value(node, name);
+
+  const value = _get_property_value(node, name, node_property);
+  console.log('value:', value);
   const type = _get_symbol_type(checker, node_property, node);
+  console.log('type:', type);
   const optional = _is_attribute_optional(checker, node_property, node);
   return {
     name,
@@ -187,10 +193,15 @@ function _get_symbol_type(
   return type_string;
 }
 
-function _get_property_value(node: ts.Node, name: string) {
+function _get_property_value(
+  node: ts.Node,
+  name: string,
+  node_property: ts.Symbol
+) {
   let value = '';
   const property_signature = _get_property_of_name(node, name);
   if (!property_signature) {
+    value = _get_imported_property(name, node_property);
     return value;
   }
   const children = property_signature.getChildren();
@@ -209,6 +220,13 @@ function _get_property_value(node: ts.Node, name: string) {
     return child.getText();
   }
   return value;
+}
+
+function _get_imported_property(name: string, node_property: ts.Symbol) {
+  const member = (node_property as any).parent.members.get(name);
+  const declaration = member.valueDeclaration.type;
+  const text = declaration.getText();
+  return text;
 }
 
 function _get_property_of_name(
@@ -389,4 +407,47 @@ function _create_ts_program(options?: GenerateOptions) {
 
 function _get_default_tsconfig_path() {
   return './tsconfig.json';
+}
+
+export function printObjectWithCircular(
+  obj: any,
+  maxDepth: number = 8,
+  currentDepth: number = 0,
+  seen: Set<any> = new Set(),
+  indent: number = 2
+) {
+  if (currentDepth > maxDepth) {
+    console.log(`${' '.repeat(indent * currentDepth)}[Reached maximum depth]`);
+    return;
+  }
+
+  if (typeof obj === 'object' && obj !== null) {
+    if (seen.has(obj)) {
+      console.log(`${' '.repeat(indent * currentDepth)}[Circular Reference]`);
+      return;
+    }
+
+    seen.add(obj);
+
+    for (const key in obj) {
+      if (typeof obj[key] !== 'function') {
+        console.log(`${' '.repeat(indent * currentDepth)}${key}:`);
+        printObjectWithCircular(
+          obj[key],
+          maxDepth,
+          currentDepth + 1,
+          seen,
+          indent
+        );
+      }
+    }
+
+    seen.delete(obj);
+  } else {
+    if (typeof obj === 'function') {
+      console.log(`${' '.repeat(indent * currentDepth)}[FUNCTION]`);
+    } else {
+      console.log(`${' '.repeat(indent * currentDepth)}${obj}`);
+    }
+  }
 }

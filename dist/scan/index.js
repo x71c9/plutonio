@@ -31,20 +31,21 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.scan = exports.atom_heritage_clause = void 0;
+exports.printObjectWithCircular = exports.scan = exports.atom_heritage_clause = void 0;
 const typescript_1 = __importDefault(require("typescript"));
 const path_1 = __importDefault(require("path"));
 const log = __importStar(require("../log/index"));
 exports.atom_heritage_clause = 'plutonio.atom';
 // const valid_kind_name = ['InterfaceDeclaration', 'TypeAliasDeclaration'];
 function scan(options) {
-    log.trace('Generating...');
+    log.trace('Scanning...');
     const { program, checker } = _create_ts_program(options);
     const schemas = _scan_all_files(program, checker);
     for (const [key, schema] of schemas) {
         console.log(key);
         log.info(schema);
     }
+    return schemas;
 }
 exports.scan = scan;
 function _scan_all_files(program, checker) {
@@ -103,7 +104,9 @@ function _generate_type(checker, type_node) {
 }
 function _generate_properties(checker, type_node) {
     const type = checker.getTypeAtLocation(type_node);
+    // console.log(type);
     const node_properties = type.getProperties();
+    // console.log(node_properties);
     const properties = [];
     for (const node_property of node_properties) {
         const property = _generate_property(checker, node_property, type_node);
@@ -113,8 +116,10 @@ function _generate_properties(checker, type_node) {
 }
 function _generate_property(checker, node_property, node) {
     const name = node_property.getName();
-    const value = _get_property_value(node, name);
+    const value = _get_property_value(node, name, node_property);
+    console.log('value:', value);
     const type = _get_symbol_type(checker, node_property, node);
+    console.log('type:', type);
     const optional = _is_attribute_optional(checker, node_property, node);
     return {
         name,
@@ -128,10 +133,11 @@ function _get_symbol_type(checker, symbol, node) {
     const type_string = checker.typeToString(property_type);
     return type_string;
 }
-function _get_property_value(node, name) {
+function _get_property_value(node, name, node_property) {
     let value = '';
     const property_signature = _get_property_of_name(node, name);
     if (!property_signature) {
+        value = _get_imported_property(name, node_property);
         return value;
     }
     const children = property_signature.getChildren();
@@ -150,6 +156,12 @@ function _get_property_value(node, name) {
         return child.getText();
     }
     return value;
+}
+function _get_imported_property(name, node_property) {
+    const member = node_property.parent.members.get(name);
+    const declaration = member.valueDeclaration.type;
+    const text = declaration.getText();
+    return text;
 }
 function _get_property_of_name(node, name) {
     const children = node.getChildren();
@@ -301,4 +313,33 @@ function _create_ts_program(options) {
 function _get_default_tsconfig_path() {
     return './tsconfig.json';
 }
+function printObjectWithCircular(obj, maxDepth = 8, currentDepth = 0, seen = new Set(), indent = 2) {
+    if (currentDepth > maxDepth) {
+        console.log(`${" ".repeat(indent * currentDepth)}[Reached maximum depth]`);
+        return;
+    }
+    if (typeof obj === 'object' && obj !== null) {
+        if (seen.has(obj)) {
+            console.log(`${" ".repeat(indent * currentDepth)}[Circular Reference]`);
+            return;
+        }
+        seen.add(obj);
+        for (const key in obj) {
+            if (typeof obj[key] !== 'function') {
+                console.log(`${" ".repeat(indent * currentDepth)}${key}:`);
+                printObjectWithCircular(obj[key], maxDepth, currentDepth + 1, seen, indent);
+            }
+        }
+        seen.delete(obj);
+    }
+    else {
+        if (typeof obj === 'function') {
+            console.log(`${" ".repeat(indent * currentDepth)}[FUNCTION]`);
+        }
+        else {
+            console.log(`${" ".repeat(indent * currentDepth)}${obj}`);
+        }
+    }
+}
+exports.printObjectWithCircular = printObjectWithCircular;
 //# sourceMappingURL=index.js.map
