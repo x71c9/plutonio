@@ -12,6 +12,12 @@ const plutonio = new PlutonioClient();
 await plutonio.users.find({id: '928032'});
 ```
 
+## Status
+
+At the moment Plutonio will infer only simple types.
+Since also the databases must be normalized, it doesn't infer complex type like
+object inside objects.
+
 ## Using Typescript typeCheker
 
 https://github.com/microsoft/TypeScript/wiki/Using-the-Compiler-API

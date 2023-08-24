@@ -169,11 +169,8 @@ function _generate_property(
   node: ts.Node
 ): Property {
   const name = node_property.getName();
-
   const value = _get_property_value(node, name, node_property);
-  console.log('value:', value);
   const type = _get_symbol_type(checker, node_property, node);
-  console.log('type:', type);
   const optional = _is_attribute_optional(checker, node_property, node);
   return {
     name,
@@ -201,7 +198,7 @@ function _get_property_value(
   let value = '';
   const property_signature = _get_property_of_name(node, name);
   if (!property_signature) {
-    value = _get_imported_property(name, node_property);
+    value = _get_imported_property_value(name, node_property);
     return value;
   }
   const children = property_signature.getChildren();
@@ -222,7 +219,7 @@ function _get_property_value(
   return value;
 }
 
-function _get_imported_property(name: string, node_property: ts.Symbol) {
+function _get_imported_property_value(name: string, node_property: ts.Symbol) {
   const member = (node_property as any).parent.members.get(name);
   const declaration = member.valueDeclaration.type;
   const text = declaration.getText();

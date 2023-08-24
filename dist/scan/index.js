@@ -117,9 +117,7 @@ function _generate_properties(checker, type_node) {
 function _generate_property(checker, node_property, node) {
     const name = node_property.getName();
     const value = _get_property_value(node, name, node_property);
-    console.log('value:', value);
     const type = _get_symbol_type(checker, node_property, node);
-    console.log('type:', type);
     const optional = _is_attribute_optional(checker, node_property, node);
     return {
         name,
@@ -137,7 +135,7 @@ function _get_property_value(node, name, node_property) {
     let value = '';
     const property_signature = _get_property_of_name(node, name);
     if (!property_signature) {
-        value = _get_imported_property(name, node_property);
+        value = _get_imported_property_value(name, node_property);
         return value;
     }
     const children = property_signature.getChildren();
@@ -157,7 +155,7 @@ function _get_property_value(node, name, node_property) {
     }
     return value;
 }
-function _get_imported_property(name, node_property) {
+function _get_imported_property_value(name, node_property) {
     const member = node_property.parent.members.get(name);
     const declaration = member.valueDeclaration.type;
     const text = declaration.getText();
@@ -315,18 +313,18 @@ function _get_default_tsconfig_path() {
 }
 function printObjectWithCircular(obj, maxDepth = 8, currentDepth = 0, seen = new Set(), indent = 2) {
     if (currentDepth > maxDepth) {
-        console.log(`${" ".repeat(indent * currentDepth)}[Reached maximum depth]`);
+        console.log(`${' '.repeat(indent * currentDepth)}[Reached maximum depth]`);
         return;
     }
     if (typeof obj === 'object' && obj !== null) {
         if (seen.has(obj)) {
-            console.log(`${" ".repeat(indent * currentDepth)}[Circular Reference]`);
+            console.log(`${' '.repeat(indent * currentDepth)}[Circular Reference]`);
             return;
         }
         seen.add(obj);
         for (const key in obj) {
             if (typeof obj[key] !== 'function') {
-                console.log(`${" ".repeat(indent * currentDepth)}${key}:`);
+                console.log(`${' '.repeat(indent * currentDepth)}${key}:`);
                 printObjectWithCircular(obj[key], maxDepth, currentDepth + 1, seen, indent);
             }
         }
@@ -334,10 +332,10 @@ function printObjectWithCircular(obj, maxDepth = 8, currentDepth = 0, seen = new
     }
     else {
         if (typeof obj === 'function') {
-            console.log(`${" ".repeat(indent * currentDepth)}[FUNCTION]`);
+            console.log(`${' '.repeat(indent * currentDepth)}[FUNCTION]`);
         }
         else {
-            console.log(`${" ".repeat(indent * currentDepth)}${obj}`);
+            console.log(`${' '.repeat(indent * currentDepth)}${obj}`);
         }
     }
 }
