@@ -94,13 +94,13 @@ function _resolve(checker, typeNode, parent_node, referencer, addToRefTypeMap = 
         console.log('ARRAY TYPE NODE', typeNode.kind);
         const arrayMetaType = {
             dataType: 'array',
-            elementType: _resolve(checker, typeNode.elementType, parent_node)
+            elementType: _resolve(checker, typeNode.elementType, parent_node),
         };
         return arrayMetaType;
     }
     if (typescript_1.default.isUnionTypeNode(typeNode)) {
         console.log('UNION TYPE NODE', typeNode.kind);
-        const types = typeNode.types.map(type => {
+        const types = typeNode.types.map((type) => {
             return _resolve(checker, type, parent_node);
         });
         const unionMetaType = {
@@ -111,7 +111,7 @@ function _resolve(checker, typeNode, parent_node, referencer, addToRefTypeMap = 
     }
     if (typescript_1.default.isIntersectionTypeNode(typeNode)) {
         console.log('INTERSECTION TYPE NODE', typeNode.kind);
-        const types = typeNode.types.map(type => {
+        const types = typeNode.types.map((type) => {
             return _resolve(checker, type, parent_node);
         });
         const intersectionMetaType = {
@@ -120,7 +120,8 @@ function _resolve(checker, typeNode, parent_node, referencer, addToRefTypeMap = 
         };
         return intersectionMetaType;
     }
-    if (typeNode.kind === typescript_1.default.SyntaxKind.AnyKeyword || typeNode.kind === typescript_1.default.SyntaxKind.UnknownKeyword) {
+    if (typeNode.kind === typescript_1.default.SyntaxKind.AnyKeyword ||
+        typeNode.kind === typescript_1.default.SyntaxKind.UnknownKeyword) {
         console.log('ANY UNKNOWN', typeNode.kind);
         const literallyAny = {
             dataType: 'any',
@@ -137,7 +138,9 @@ function _resolve(checker, typeNode, parent_node, referencer, addToRefTypeMap = 
     }
     if (typescript_1.default.isTypeLiteralNode(typeNode)) {
         console.log('TYPE LITERAL', typeNode.kind);
-        const properties = typeNode.members.filter(typescript_1.default.isPropertySignature).reduce((res, propertySignature) => {
+        const properties = typeNode.members
+            .filter(typescript_1.default.isPropertySignature)
+            .reduce((res, propertySignature) => {
             const type = _resolve(checker, propertySignature.type, propertySignature);
             const property = {
                 // example: getNodeExample(propertySignature),
@@ -153,7 +156,7 @@ function _resolve(checker, typeNode, parent_node, referencer, addToRefTypeMap = 
             };
             return [property, ...res];
         }, []);
-        const indexMember = typeNode.members.find(member => typescript_1.default.isIndexSignatureDeclaration(member));
+        const indexMember = typeNode.members.find((member) => typescript_1.default.isIndexSignatureDeclaration(member));
         let additionalType;
         if (indexMember) {
             const indexSignatureDeclaration = indexMember;
@@ -174,34 +177,43 @@ function _resolve(checker, typeNode, parent_node, referencer, addToRefTypeMap = 
         console.log('MAPPED TYPE NODE', typeNode.kind);
         return { typenode: 'mapped' };
     }
-    if (typescript_1.default.isConditionalTypeNode(typeNode) && referencer && typescript_1.default.isTypeReferenceNode(referencer)) {
+    if (typescript_1.default.isConditionalTypeNode(typeNode) &&
+        referencer &&
+        typescript_1.default.isTypeReferenceNode(referencer)) {
         console.log('CONDITIONAL TYPE NODE', typeNode.kind);
         return { typenode: 'conditional' };
     }
     //keyof
-    if (typescript_1.default.isTypeOperatorNode(typeNode) && typeNode.operator === typescript_1.default.SyntaxKind.KeyOfKeyword) {
+    if (typescript_1.default.isTypeOperatorNode(typeNode) &&
+        typeNode.operator === typescript_1.default.SyntaxKind.KeyOfKeyword) {
         console.log('TYPE OPERATOR keyof', typeNode.kind);
         return { typenode: 'keyof' };
     }
     // Handle `readonly` arrays
-    if (typescript_1.default.isTypeOperatorNode(typeNode) && typeNode.operator === typescript_1.default.SyntaxKind.ReadonlyKeyword) {
+    if (typescript_1.default.isTypeOperatorNode(typeNode) &&
+        typeNode.operator === typescript_1.default.SyntaxKind.ReadonlyKeyword) {
         console.log('TYPE OPERATION READONLY', typeNode.kind);
         return { typenode: 'readonly' };
     }
     // Indexed by keyword
-    if (typescript_1.default.isIndexedAccessTypeNode(typeNode) && (typeNode.indexType.kind === typescript_1.default.SyntaxKind.NumberKeyword || typeNode.indexType.kind === typescript_1.default.SyntaxKind.StringKeyword)) {
+    if (typescript_1.default.isIndexedAccessTypeNode(typeNode) &&
+        (typeNode.indexType.kind === typescript_1.default.SyntaxKind.NumberKeyword ||
+            typeNode.indexType.kind === typescript_1.default.SyntaxKind.StringKeyword)) {
         console.log('INDEXED ACCESS', typeNode.kind);
         return { typenode: 'index by keyword' };
     }
     // Indexed by literal
     if (typescript_1.default.isIndexedAccessTypeNode(typeNode) &&
         typescript_1.default.isLiteralTypeNode(typeNode.indexType) &&
-        (typescript_1.default.isStringLiteral(typeNode.indexType.literal) || typescript_1.default.isNumericLiteral(typeNode.indexType.literal))) {
+        (typescript_1.default.isStringLiteral(typeNode.indexType.literal) ||
+            typescript_1.default.isNumericLiteral(typeNode.indexType.literal))) {
         console.log('INDEXED ACCESS BY LITERAL', typeNode.kind);
         return { typenode: 'index by literal' };
     }
     // Indexed by keyof typeof value
-    if (typescript_1.default.isIndexedAccessTypeNode(typeNode) && typescript_1.default.isTypeOperatorNode(typeNode.indexType) && typeNode.indexType.operator === typescript_1.default.SyntaxKind.KeyOfKeyword) {
+    if (typescript_1.default.isIndexedAccessTypeNode(typeNode) &&
+        typescript_1.default.isTypeOperatorNode(typeNode.indexType) &&
+        typeNode.indexType.operator === typescript_1.default.SyntaxKind.KeyOfKeyword) {
         console.log('INDEXED KEYOF TYPEOF', typeNode.kind);
         return { typenode: 'indexed keyof typeof' };
     }
@@ -322,7 +334,6 @@ function attemptToResolveKindToPrimitive(syntaxKind) {
         };
     }
 }
-;
 function _create_ts_program(options) {
     log.trace('Creating Typescript program...');
     let tsconfig_path = _get_default_tsconfig_path();
@@ -427,9 +438,11 @@ function getReferenceType(node, checker, addToRefTypeMap = true, context = {}) {
     }
     // Can't invoke getText on Synthetic Nodes
     let resolvableName = node.pos !== -1 ? node.getText() : type.text;
-    if (node.pos === -1 && 'typeArguments' in node && Array.isArray(node.typeArguments)) {
+    if (node.pos === -1 &&
+        'typeArguments' in node &&
+        Array.isArray(node.typeArguments)) {
         // Add typearguments for Synthetic nodes (e.g. Record<> in TestClassModel.indexedResponse)
-        const argumentsString = node.typeArguments.map(arg => {
+        const argumentsString = node.typeArguments.map((arg) => {
             if (typescript_1.default.isLiteralTypeNode(arg)) {
                 return `'${String(getLiteralValue(arg))}'`;
             }
@@ -467,7 +480,7 @@ function getReferenceType(node, checker, addToRefTypeMap = true, context = {}) {
                 // refName: getRefTypeName(name),
                 // enums: [current.typeChecker.getConstantValue(declaration)!],
                 enumVarnames: [declaration.name.getText()],
-                deprecated: isExistJSDocTag(declaration, tag => tag.tagName.text === 'deprecated'),
+                deprecated: isExistJSDocTag(declaration, (tag) => tag.tagName.text === 'deprecated'),
             };
         }
         else {
@@ -508,7 +521,10 @@ function typeArgumentsToContext(type, targetEntity, context, typeChecker) {
             const typeArg = type.typeArguments && type.typeArguments[index];
             let resolvedType;
             // Argument may be a forward reference from context
-            if (typeArg && typescript_1.default.isTypeReferenceNode(typeArg) && typescript_1.default.isIdentifier(typeArg.typeName) && context[typeArg.typeName.text]) {
+            if (typeArg &&
+                typescript_1.default.isTypeReferenceNode(typeArg) &&
+                typescript_1.default.isIdentifier(typeArg.typeName) &&
+                context[typeArg.typeName.text]) {
                 resolvedType = context[typeArg.typeName.text];
             }
             else if (typeArg) {
@@ -547,21 +563,31 @@ function getModelTypeDeclaration(type, checker) {
     }
     if (modelTypes.length > 1) {
         // remove types that are from typescript e.g. 'Account'
-        modelTypes = modelTypes.filter(modelType => {
-            return modelType.getSourceFile().fileName.replace(/\\/g, '/').toLowerCase().indexOf('node_modules/typescript') <= -1;
+        modelTypes = modelTypes.filter((modelType) => {
+            return (modelType
+                .getSourceFile()
+                .fileName.replace(/\\/g, '/')
+                .toLowerCase()
+                .indexOf('node_modules/typescript') <= -1);
         });
         modelTypes = getDesignatedModels(modelTypes, typeName);
     }
     if (modelTypes.length > 1) {
-        const conflicts = modelTypes.map(modelType => modelType.getSourceFile().fileName).join('"; "');
+        const conflicts = modelTypes
+            .map((modelType) => modelType.getSourceFile().fileName)
+            .join('"; "');
         throw new Error(`Multiple matching models found for referenced type ${typeName}; please make model names unique. Conflicts found: "${conflicts}".`);
     }
     return modelTypes[0];
 }
 function getSymbolAtLocation(type, typeChecker) {
-    const symbol = typeChecker.getSymbolAtLocation(type) || type.symbol;
+    const symbol = typeChecker.getSymbolAtLocation(type) ||
+        type.symbol;
     // resolve alias if it is an alias, otherwise take symbol directly
-    return (symbol && hasFlag(symbol, typescript_1.default.SymbolFlags.Alias) && typeChecker.getAliasedSymbol(symbol)) || symbol;
+    return ((symbol &&
+        hasFlag(symbol, typescript_1.default.SymbolFlags.Alias) &&
+        typeChecker.getAliasedSymbol(symbol)) ||
+        symbol);
 }
 function hasFlag(type, flag) {
     return (type.flags & flag) === flag;
@@ -570,8 +596,8 @@ function getDesignatedModels(nodes, typeName) {
     /**
      * Model is marked with '@tsoaModel', indicating that it should be the 'canonical' model used
      */
-    const designatedNodes = nodes.filter(enumNode => {
-        return isExistJSDocTag(enumNode, tag => tag.tagName.text === 'tsoaModel');
+    const designatedNodes = nodes.filter((enumNode) => {
+        return isExistJSDocTag(enumNode, (tag) => tag.tagName.text === 'tsoaModel');
     });
     if (designatedNodes.length > 0) {
         if (designatedNodes.length > 1) {
@@ -599,9 +625,12 @@ function getEnumerateType(typeName, typeChecker) {
     const enumName = typeName.text;
     const symbol = getSymbolAtLocation(typeName, typeChecker);
     // resolve value
-    let declaredType = (((_a = typeChecker.getDeclaredTypeOfSymbol(symbol)) === null || _a === void 0 ? void 0 : _a.symbol) || symbol);
+    let declaredType = (((_a = typeChecker.getDeclaredTypeOfSymbol(symbol)) === null || _a === void 0 ? void 0 : _a.symbol) ||
+        symbol);
     // if we are a EnumMember, return parent instead (this happens if a enum has only one entry, not quite sure why though...)
-    if (hasFlag(declaredType, typescript_1.default.SymbolFlags.EnumMember) && ((_c = (_b = declaredType.parent) === null || _b === void 0 ? void 0 : _b.valueDeclaration) === null || _c === void 0 ? void 0 : _c.kind) === typescript_1.default.SyntaxKind.EnumDeclaration) {
+    if (hasFlag(declaredType, typescript_1.default.SymbolFlags.EnumMember) &&
+        ((_c = (_b = declaredType.parent) === null || _b === void 0 ? void 0 : _b.valueDeclaration) === null || _c === void 0 ? void 0 : _c.kind) ===
+            typescript_1.default.SyntaxKind.EnumDeclaration) {
         declaredType = declaredType.parent;
     }
     const declarations = declaredType.getDeclarations();
@@ -622,15 +651,19 @@ function getEnumerateType(typeName, typeChecker) {
     const isNotUndefined = (item) => {
         return item === undefined ? false : true;
     };
-    const enums = enumDeclaration.members.map(e => typeChecker.getConstantValue(e)).filter(isNotUndefined);
-    const enumVarnames = enumDeclaration.members.map(e => e.name.getText()).filter(isNotUndefined);
+    const enums = enumDeclaration.members
+        .map((e) => typeChecker.getConstantValue(e))
+        .filter(isNotUndefined);
+    const enumVarnames = enumDeclaration.members
+        .map((e) => e.name.getText())
+        .filter(isNotUndefined);
     return {
         dataType: 'refEnum',
         // description: this.getNodeDescription(enumDeclaration),
         enums,
         enumVarnames,
         refName: enumName,
-        deprecated: isExistJSDocTag(enumDeclaration, tag => tag.tagName.text === 'deprecated'),
+        deprecated: isExistJSDocTag(enumDeclaration, (tag) => tag.tagName.text === 'deprecated'),
     };
 }
 function nodeIsUsable(node) {
@@ -650,7 +683,7 @@ function createCircularDependencyResolver(refName) {
         dataType: 'refObject',
         refName,
     };
-    OnFinish(referenceTypes => {
+    OnFinish((referenceTypes) => {
         const realReferenceType = referenceTypes[refName];
         if (!realReferenceType) {
             return;
