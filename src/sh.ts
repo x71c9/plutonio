@@ -4,6 +4,7 @@ import {program} from 'commander';
 import {generate} from './generate/index';
 import {scan} from './scan/index';
 import {resolve} from './resolve/index';
+import {read} from './read/index';
 
 program.name('plutonio');
 
@@ -20,6 +21,11 @@ program.command('scan').action(() => {
 program.command('resolve').action(() => {
   const resolved = resolve();
   console.log(`resolved: `, resolved);
+});
+
+program.command('read').action(() => {
+  const readed = read();
+  console.log(`read: `, readed);
 });
 
 program.parse();

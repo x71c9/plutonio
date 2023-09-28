@@ -5,6 +5,30 @@
  */
 import * as c from '../config/index';
 export declare const atom_heritage_clause = "plutonio.atom";
+export type Type = any;
+export interface Extension {
+    key: `x-${string}`;
+    value: any;
+}
+export type Validator = any;
+type AllKeys<T> = T extends any ? keyof T : never;
+export type ValidatorKey = AllKeys<Validator>;
+export type Validators = Partial<Record<ValidatorKey, {
+    value?: unknown;
+    errorMsg?: string;
+}>>;
+export interface Property {
+    default?: unknown;
+    description?: string;
+    format?: string;
+    example?: unknown;
+    name: string;
+    type: Type;
+    required: boolean;
+    validators: Validators;
+    deprecated: boolean;
+    extensions?: Extension[];
+}
 export type GenerateOptions = {
     tsconfig_path?: string;
 };
@@ -28,3 +52,4 @@ export type ReferenceType = {};
 export interface ReferenceTypeMap {
     [refName: string]: ReferenceType;
 }
+export {};

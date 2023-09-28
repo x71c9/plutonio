@@ -15,6 +15,64 @@ export const atom_heritage_clause = 'plutonio.atom';
 const localReferenceTypeCache: {[typeName: string]: ReferenceType} = {};
 const inProgressTypes: {[typeName: string]: boolean} = {};
 
+type OverrideToken =
+  | ts.Token<ts.SyntaxKind.QuestionToken>
+  | ts.Token<ts.SyntaxKind.PlusToken>
+  | ts.Token<ts.SyntaxKind.MinusToken>
+  | undefined;
+
+export type Type = any;
+// | PrimitiveType
+// | ObjectsNoPropsType
+// | EnumType
+// | ArrayType
+// | FileType
+// | DateTimeType
+// | DateType
+// | BinaryType
+// | BufferType
+// | ByteType
+// | AnyType
+// | RefEnumType
+// | RefObjectType
+// | RefAliasType
+// | NestedObjectLiteralType
+// | UnionType
+// | IntersectionType;
+
+// export type Validator =
+//   | IntegerValidator
+//   | FloatValidator
+//   | DateValidator
+//   | DateTimeValidator
+//   | StringValidator
+//   | BooleanValidator
+//   | ArrayValidator;
+export interface Extension {
+  key: `x-${string}`;
+  // value: ExtensionType | ExtensionType[];
+  value: any;
+}
+export type Validator = any;
+type AllKeys<T> = T extends any ? keyof T : never;
+export type ValidatorKey = AllKeys<Validator>;
+export type Validators = Partial<
+  Record<ValidatorKey, {value?: unknown; errorMsg?: string}>
+>;
+
+export interface Property {
+  default?: unknown;
+  description?: string;
+  format?: string;
+  example?: unknown;
+  name: string;
+  type: Type;
+  required: boolean;
+  validators: Validators;
+  deprecated: boolean;
+  extensions?: Extension[];
+}
+
 export type GenerateOptions = {
   tsconfig_path?: string;
 };
@@ -618,7 +676,7 @@ function getReferenceType(
       };
       console.log(`REFERENCE TYPE: `, referenceType);
     } else {
-      referenceType = getModelReference(declaration, name);
+      referenceType = getModelReference(checker, declaration, name);
     }
 
     // localReferenceTypeCache[name] = referenceType;
@@ -1219,3 +1277,247 @@ function safeFromJson(json: string) {
 // } {
 //   return typeof tsNamespace.canHaveDecorators === 'function';
 // }
+//
+
+function getModelProperties(
+  node: ts.InterfaceDeclaration | ts.ClassDeclaration,
+  overrideToken?: OverrideToken
+): Property[] {
+  const isIgnored = (e: ts.TypeElement | ts.ClassElement) => {
+    return isExistJSDocTag(e, (tag) => tag.tagName.text === 'ignore');
+  };
+
+  // Interface model
+  if (ts.isInterfaceDeclaration(node)) {
+    return node.members
+      .filter(
+        (member): member is ts.PropertySignature =>
+          !isIgnored(member) && ts.isPropertySignature(member)
+      )
+      .map((member: ts.PropertySignature) =>
+        propertyFromSignature(member, overrideToken)
+      );
+  }
+
+  const properties: Array<ts.PropertyDeclaration | ts.ParameterDeclaration> =
+    [];
+
+  for (const member of node.members) {
+    if (
+      !isIgnored(member) &&
+      ts.isPropertyDeclaration(member) &&
+      !this.hasStaticModifier(member) &&
+      this.hasPublicModifier(member)
+    ) {
+      properties.push(member);
+    }
+  }
+
+  const classConstructor = node.members.find((member) =>
+    ts.isConstructorDeclaration(member)
+  ) as ts.ConstructorDeclaration;
+
+  if (classConstructor && classConstructor.parameters) {
+    const constructorProperties = classConstructor.parameters.filter(
+      (parameter) => this.isAccessibleParameter(parameter)
+    );
+
+    properties.push(...constructorProperties);
+  }
+
+  return properties.map((property) =>
+    propertyFromDeclaration(property, overrideToken)
+  );
+}
+
+function propertyFromSignature(
+  propertySignature: ts.PropertySignature,
+  overrideToken?: OverrideToken
+) {
+  const identifier = propertySignature.name as ts.Identifier;
+
+  if (!propertySignature.type) {
+    throw new Error(`No valid type found for property declaration.`);
+  }
+
+  let required = !propertySignature.questionToken;
+  if (overrideToken && overrideToken.kind === ts.SyntaxKind.MinusToken) {
+    required = true;
+  } else if (
+    overrideToken &&
+    overrideToken.kind === ts.SyntaxKind.QuestionToken
+  ) {
+    required = false;
+  }
+
+  const property: Property = {
+    default: getJSDocComment(propertySignature, 'default'),
+    description: this.getNodeDescription(propertySignature),
+    example: this.getNodeExample(propertySignature),
+    format: this.getNodeFormat(propertySignature),
+    name: identifier.text,
+    required,
+    type: new TypeResolver(
+      propertySignature.type,
+      this.current,
+      propertySignature.type.parent,
+      this.context,
+      propertySignature.type
+    ).resolve(),
+    validators: getPropertyValidators(propertySignature) || {},
+    deprecated: isExistJSDocTag(
+      propertySignature,
+      (tag) => tag.tagName.text === 'deprecated'
+    ),
+    extensions: this.getNodeExtension(propertySignature),
+  };
+  return property;
+}
+
+function propertyFromDeclaration(
+  checker: ts.TypeChecker,
+  propertyDeclaration: ts.PropertyDeclaration | ts.ParameterDeclaration,
+  overrideToken?: OverrideToken
+) {
+  const identifier = propertyDeclaration.name as ts.Identifier;
+  let typeNode = propertyDeclaration.type;
+
+  if (!typeNode) {
+    const tsType =
+      this.current.typeChecker.getTypeAtLocation(propertyDeclaration);
+    typeNode = this.current.typeChecker.typeToTypeNode(
+      tsType,
+      undefined,
+      ts.NodeBuilderFlags.NoTruncation
+    );
+  }
+
+  if (!typeNode) {
+    throw new Error(`No valid type found for property declaration.`);
+  }
+
+  // const type = new TypeResolver(typeNode, this.current, propertyDeclaration, this.context, typeNode).resolve();
+  const type = _resolve(checker, typeNode.elementType, parent_node);
+
+  let required =
+    !propertyDeclaration.questionToken && !propertyDeclaration.initializer;
+  if (overrideToken && overrideToken.kind === ts.SyntaxKind.MinusToken) {
+    required = true;
+  } else if (
+    overrideToken &&
+    overrideToken.kind === ts.SyntaxKind.QuestionToken
+  ) {
+    required = false;
+  }
+
+  const property: Property = {
+    default: getInitializerValue(
+      propertyDeclaration.initializer,
+      this.current.typeChecker
+    ),
+    description: this.getNodeDescription(propertyDeclaration),
+    example: this.getNodeExample(propertyDeclaration),
+    format: this.getNodeFormat(propertyDeclaration),
+    name: identifier.text,
+    required,
+    type,
+    validators: getPropertyValidators(propertyDeclaration) || {},
+    // class properties and constructor parameters may be deprecated either via jsdoc annotation or decorator
+    deprecated:
+      isExistJSDocTag(
+        propertyDeclaration,
+        (tag) => tag.tagName.text === 'deprecated'
+      ) ||
+      isDecorator(
+        propertyDeclaration,
+        (identifier) => identifier.text === 'Deprecated'
+      ),
+    extensions: this.getNodeExtension(propertyDeclaration),
+  };
+  return property;
+}
+
+function getModelAdditionalProperties(node: UsableDeclaration) {
+  if (node.kind === ts.SyntaxKind.InterfaceDeclaration) {
+    const interfaceDeclaration = node;
+    const indexMember = interfaceDeclaration.members.find(
+      (member) => member.kind === ts.SyntaxKind.IndexSignature
+    );
+    if (!indexMember) {
+      return undefined;
+    }
+
+    const indexSignatureDeclaration =
+      indexMember as ts.IndexSignatureDeclaration;
+    // const indexType = new TypeResolver(indexSignatureDeclaration.parameters[0].type as ts.TypeNode, this.current, this.parentNode, this.context).resolve();
+    const indexType = _resolve(checker, typeNode.elementType, parent_node);
+    if (indexType.dataType !== 'string') {
+      throw new Error(`Only string indexers are supported.`, this.typeNode);
+    }
+
+    // return new TypeResolver(indexSignatureDeclaration.type, this.current, this.parentNode, this.context).resolve();
+    return _resolve(checker, typeNode.elementType, parent_node);
+  }
+
+  return undefined;
+}
+
+function getModelInheritedProperties(
+  modelTypeDeclaration: Exclude<
+    UsableDeclaration,
+    ts.PropertySignature | ts.TypeAliasDeclaration | ts.EnumMember
+  >
+): Property[] {
+  let properties: Property[] = [];
+
+  const heritageClauses = modelTypeDeclaration.heritageClauses;
+  if (!heritageClauses) {
+    return properties;
+  }
+
+  for (const clause of heritageClauses) {
+    if (!clause.types) {
+      continue;
+    }
+
+    for (const t of clause.types) {
+      const baseEntityName = t.expression as ts.EntityName;
+
+      // create subContext
+      const resetCtx = this.typeArgumentsToContext(
+        t,
+        baseEntityName,
+        this.context
+      );
+
+      const referenceType = this.getReferenceType(t, false);
+      if (referenceType) {
+        if (referenceType.dataType === 'refEnum') {
+          // since it doesn't have properties to iterate over, then we don't do anything with it
+        } else if (referenceType.dataType === 'refAlias') {
+          let type: Tsoa.Type = referenceType;
+          while (type.dataType === 'refAlias') {
+            type = type.type;
+          }
+
+          if (type.dataType === 'refObject') {
+            properties = [...properties, ...type.properties];
+          } else if (type.dataType === 'nestedObjectLiteral') {
+            properties = [...properties, ...type.properties];
+          }
+        } else if (referenceType.dataType === 'refObject') {
+          (referenceType.properties || []).forEach((property) =>
+            properties.push(property)
+          );
+        } else {
+          assertNever(referenceType);
+        }
+      }
+
+      // reset subContext
+      this.context = resetCtx;
+    }
+  }
+
+  return properties;
+}

@@ -487,7 +487,7 @@ function getReferenceType(checker, node, parent_node, addToRefTypeMap = true, co
             console.log(`REFERENCE TYPE: `, referenceType);
         }
         else {
-            referenceType = getModelReference(declaration, name);
+            referenceType = getModelReference(checker, declaration, name);
         }
         // localReferenceTypeCache[name] = referenceType;
         return referenceType;
@@ -730,7 +730,8 @@ function getRefTypeName(name) {
         .replace(/{|}/g, '_') // SuccessResponse_{indexesCreated-number}_ -> SuccessResponse__indexesCreated-number__
         .replace(/([a-z]+):([a-z]+)/gi, '$1-$2') // SuccessResponse_indexesCreated:number_ -> SuccessResponse_indexesCreated-number_
         .replace(/;/g, '--')
-        .replace(/([a-z]+)\[([a-z]+)\]/gi, '$1-at-$2'));
+        .replace(/([a-z]+)\[([a-z]+)\]/gi, '$1-at-$2') // Partial_SerializedDatasourceWithVersion[format]_ -> Partial_SerializedDatasourceWithVersion~format~_,
+    );
 }
 function getNodeFormat(node) {
     return getJSDocComment(node, 'format');
@@ -743,12 +744,12 @@ function getJSDocComment(node, tagName) {
     return;
 }
 function getJSDocComments(node, tagName) {
-    const tags = getJSDocTags(node, tag => tag.tagName.text === tagName || tag.tagName.escapedText === tagName);
+    const tags = getJSDocTags(node, (tag) => tag.tagName.text === tagName || tag.tagName.escapedText === tagName);
     if (tags.length === 0) {
         return;
     }
     const comments = [];
-    tags.forEach(tag => {
+    tags.forEach((tag) => {
         const comment = commentToString(tag.comment);
         if (comment)
             comments.push(comment);
@@ -771,7 +772,7 @@ function commentToString(comment) {
         return comment;
     }
     else if (comment) {
-        return comment.map(node => node.text).join(' ');
+        return comment.map((node) => node.text).join(' ');
     }
     return undefined;
 }
@@ -786,7 +787,10 @@ function getModelReference(typeChecker, modelType, name) {
     }
     const type = typeChecker.getTypeAtLocation(modelType.name);
     const toJSON = typeChecker.getPropertyOfType(type, 'toJSON');
-    if (toJSON && toJSON.valueDeclaration && (typescript_1.default.isMethodDeclaration(toJSON.valueDeclaration) || typescript_1.default.isMethodSignature(toJSON.valueDeclaration))) {
+    if (toJSON &&
+        toJSON.valueDeclaration &&
+        (typescript_1.default.isMethodDeclaration(toJSON.valueDeclaration) ||
+            typescript_1.default.isMethodSignature(toJSON.valueDeclaration))) {
         let nodeType = toJSON.valueDeclaration.type;
         if (!nodeType) {
             const signature = typeChecker.getSignatureFromDeclaration(toJSON.valueDeclaration);
@@ -895,4 +899,156 @@ function safeFromJson(json) {
 // } {
 //   return typeof tsNamespace.canHaveDecorators === 'function';
 // }
+//
+function getModelProperties(node, overrideToken) {
+    const isIgnored = (e) => {
+        return isExistJSDocTag(e, (tag) => tag.tagName.text === 'ignore');
+    };
+    // Interface model
+    if (typescript_1.default.isInterfaceDeclaration(node)) {
+        return node.members
+            .filter((member) => !isIgnored(member) && typescript_1.default.isPropertySignature(member))
+            .map((member) => propertyFromSignature(member, overrideToken));
+    }
+    const properties = [];
+    for (const member of node.members) {
+        if (!isIgnored(member) &&
+            typescript_1.default.isPropertyDeclaration(member) &&
+            !this.hasStaticModifier(member) &&
+            this.hasPublicModifier(member)) {
+            properties.push(member);
+        }
+    }
+    const classConstructor = node.members.find((member) => typescript_1.default.isConstructorDeclaration(member));
+    if (classConstructor && classConstructor.parameters) {
+        const constructorProperties = classConstructor.parameters.filter((parameter) => this.isAccessibleParameter(parameter));
+        properties.push(...constructorProperties);
+    }
+    return properties.map((property) => propertyFromDeclaration(property, overrideToken));
+}
+function propertyFromSignature(propertySignature, overrideToken) {
+    const identifier = propertySignature.name;
+    if (!propertySignature.type) {
+        throw new Error(`No valid type found for property declaration.`);
+    }
+    let required = !propertySignature.questionToken;
+    if (overrideToken && overrideToken.kind === typescript_1.default.SyntaxKind.MinusToken) {
+        required = true;
+    }
+    else if (overrideToken &&
+        overrideToken.kind === typescript_1.default.SyntaxKind.QuestionToken) {
+        required = false;
+    }
+    const property = {
+        default: getJSDocComment(propertySignature, 'default'),
+        description: this.getNodeDescription(propertySignature),
+        example: this.getNodeExample(propertySignature),
+        format: this.getNodeFormat(propertySignature),
+        name: identifier.text,
+        required,
+        type: new TypeResolver(propertySignature.type, this.current, propertySignature.type.parent, this.context, propertySignature.type).resolve(),
+        validators: getPropertyValidators(propertySignature) || {},
+        deprecated: isExistJSDocTag(propertySignature, (tag) => tag.tagName.text === 'deprecated'),
+        extensions: this.getNodeExtension(propertySignature),
+    };
+    return property;
+}
+function propertyFromDeclaration(checker, propertyDeclaration, overrideToken) {
+    const identifier = propertyDeclaration.name;
+    let typeNode = propertyDeclaration.type;
+    if (!typeNode) {
+        const tsType = this.current.typeChecker.getTypeAtLocation(propertyDeclaration);
+        typeNode = this.current.typeChecker.typeToTypeNode(tsType, undefined, typescript_1.default.NodeBuilderFlags.NoTruncation);
+    }
+    if (!typeNode) {
+        throw new Error(`No valid type found for property declaration.`);
+    }
+    // const type = new TypeResolver(typeNode, this.current, propertyDeclaration, this.context, typeNode).resolve();
+    const type = _resolve(checker, typeNode.elementType, parent_node);
+    let required = !propertyDeclaration.questionToken && !propertyDeclaration.initializer;
+    if (overrideToken && overrideToken.kind === typescript_1.default.SyntaxKind.MinusToken) {
+        required = true;
+    }
+    else if (overrideToken &&
+        overrideToken.kind === typescript_1.default.SyntaxKind.QuestionToken) {
+        required = false;
+    }
+    const property = {
+        default: getInitializerValue(propertyDeclaration.initializer, this.current.typeChecker),
+        description: this.getNodeDescription(propertyDeclaration),
+        example: this.getNodeExample(propertyDeclaration),
+        format: this.getNodeFormat(propertyDeclaration),
+        name: identifier.text,
+        required,
+        type,
+        validators: getPropertyValidators(propertyDeclaration) || {},
+        // class properties and constructor parameters may be deprecated either via jsdoc annotation or decorator
+        deprecated: isExistJSDocTag(propertyDeclaration, (tag) => tag.tagName.text === 'deprecated') ||
+            isDecorator(propertyDeclaration, (identifier) => identifier.text === 'Deprecated'),
+        extensions: this.getNodeExtension(propertyDeclaration),
+    };
+    return property;
+}
+function getModelAdditionalProperties(node) {
+    if (node.kind === typescript_1.default.SyntaxKind.InterfaceDeclaration) {
+        const interfaceDeclaration = node;
+        const indexMember = interfaceDeclaration.members.find((member) => member.kind === typescript_1.default.SyntaxKind.IndexSignature);
+        if (!indexMember) {
+            return undefined;
+        }
+        const indexSignatureDeclaration = indexMember;
+        // const indexType = new TypeResolver(indexSignatureDeclaration.parameters[0].type as ts.TypeNode, this.current, this.parentNode, this.context).resolve();
+        const indexType = _resolve(checker, typeNode.elementType, parent_node);
+        if (indexType.dataType !== 'string') {
+            throw new Error(`Only string indexers are supported.`, this.typeNode);
+        }
+        // return new TypeResolver(indexSignatureDeclaration.type, this.current, this.parentNode, this.context).resolve();
+        return _resolve(checker, typeNode.elementType, parent_node);
+    }
+    return undefined;
+}
+function getModelInheritedProperties(modelTypeDeclaration) {
+    let properties = [];
+    const heritageClauses = modelTypeDeclaration.heritageClauses;
+    if (!heritageClauses) {
+        return properties;
+    }
+    for (const clause of heritageClauses) {
+        if (!clause.types) {
+            continue;
+        }
+        for (const t of clause.types) {
+            const baseEntityName = t.expression;
+            // create subContext
+            const resetCtx = this.typeArgumentsToContext(t, baseEntityName, this.context);
+            const referenceType = this.getReferenceType(t, false);
+            if (referenceType) {
+                if (referenceType.dataType === 'refEnum') {
+                    // since it doesn't have properties to iterate over, then we don't do anything with it
+                }
+                else if (referenceType.dataType === 'refAlias') {
+                    let type = referenceType;
+                    while (type.dataType === 'refAlias') {
+                        type = type.type;
+                    }
+                    if (type.dataType === 'refObject') {
+                        properties = [...properties, ...type.properties];
+                    }
+                    else if (type.dataType === 'nestedObjectLiteral') {
+                        properties = [...properties, ...type.properties];
+                    }
+                }
+                else if (referenceType.dataType === 'refObject') {
+                    (referenceType.properties || []).forEach((property) => properties.push(property));
+                }
+                else {
+                    assertNever(referenceType);
+                }
+            }
+            // reset subContext
+            this.context = resetCtx;
+        }
+    }
+    return properties;
+}
 //# sourceMappingURL=index.js.map
