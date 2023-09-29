@@ -1,7 +1,7 @@
 "use strict";
 /**
  *
- * Generate module
+ * Read module
  *
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
@@ -69,7 +69,8 @@ function _resolve_schema_for(program, source_file) {
         const name = t.name.getText();
         console.log(`Generating schema for type ${name}...`);
         const full_text = t.getFullText();
-        const type_schema = _generate_schema(program, name, 'type');
+        let type_schema = _generate_schema(program, name, 'type');
+        type_schema = _update_properties(t, type_schema);
         schemas[name] = type_schema;
         schemas[name].full_text = full_text;
     }
@@ -77,7 +78,8 @@ function _resolve_schema_for(program, source_file) {
         const name = i.name.getText();
         console.log(`Generating schema for interface ${name}...`);
         const full_text = i.getFullText();
-        const interface_schema = _generate_schema(program, name, 'interface');
+        let interface_schema = _generate_schema(program, name, 'interface');
+        interface_schema = _update_properties(i, interface_schema);
         schemas[name] = interface_schema;
         schemas[name].full_text = full_text;
         schemas[name].extends = _get_heritage(i);
@@ -91,7 +93,7 @@ function _get_heritage(i) {
         const expression_with_typed_arguments = _get_syntax_kind(heritage_clause, typescript_1.default.SyntaxKind.ExpressionWithTypeArguments);
         expressions = expressions.concat(expression_with_typed_arguments);
     }
-    return expressions.map(e => e.getText());
+    return expressions.map((e) => e.getText());
 }
 function _generate_schema(program, name, category) {
     const partial_args = {
@@ -210,5 +212,32 @@ function _generate_import(import_node) {
         clause,
         specifiers: [],
     };
+}
+function _update_properties(node, schema) {
+    const property_signatures = _get_syntax_kind(node, typescript_1.default.SyntaxKind.PropertySignature);
+    const prop_signature_map = new Map();
+    for (const prop_sign of property_signatures) {
+        const identifiers = _get_syntax_kind(prop_sign, typescript_1.default.SyntaxKind.Identifier);
+        const identifier = identifiers[0];
+        const prop_name = identifier.getText();
+        prop_signature_map.set(prop_name, prop_sign);
+    }
+    if (!schema.properties) {
+        return schema;
+    }
+    for (const [prop_name, prop_def] of Object.entries(schema.properties)) {
+        const prop_signature = prop_signature_map.get(prop_name);
+        if (!prop_signature) {
+            continue;
+        }
+        const type_references = _get_syntax_kind(prop_signature, typescript_1.default.SyntaxKind.TypeReference);
+        if (type_references.length === 0) {
+            continue;
+        }
+        const type_ref = type_references[0];
+        // TODO: FIX
+        prop_def.original = type_ref.getText();
+    }
+    return schema;
 }
 //# sourceMappingURL=index.js.map
