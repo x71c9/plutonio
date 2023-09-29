@@ -1,7 +1,7 @@
 "use strict";
 /**
  *
- * Resolve module
+ * Generate module
  *
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
@@ -31,17 +31,86 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.read = exports.atom_heritage_clause = void 0;
+exports.read = void 0;
 const typescript_1 = __importDefault(require("typescript"));
 const path_1 = __importDefault(require("path"));
+const tjs = __importStar(require("typescript-json-schema"));
 const log = __importStar(require("../log/index"));
-exports.atom_heritage_clause = 'plutonio.atom';
 function read(options) {
-    log.trace('Resolving...');
-    const { program, checker } = _create_ts_program(options);
-    console.log(program, checker);
+    log.trace('Reading...');
+    const { program } = _create_ts_program(options);
+    const schemas = _read_all_files(program);
+    console.log(schemas);
+    return schemas;
 }
 exports.read = read;
+function _read_all_files(program) {
+    const schemas_by_file = new Map();
+    for (const source_file of program.getSourceFiles()) {
+        if (source_file.isDeclarationFile) {
+            continue;
+        }
+        log.debug(`Reading ${source_file.fileName}...`);
+        const schemas = _resolve_schema_for(program, source_file);
+        schemas_by_file.set(source_file.fileName, schemas);
+    }
+    return schemas_by_file;
+}
+function _resolve_schema_for(program, source_file) {
+    const schemas = {};
+    const types = _get_types(source_file);
+    const interfaces = _get_interfaces(source_file);
+    for (const t of types) {
+        const name = t.name.getText();
+        console.log(`Generating schema for type ${name}...`);
+        const type_schema = _generate_schema(program, name, 'type');
+        schemas[name] = type_schema;
+    }
+    for (const i of interfaces) {
+        const name = i.name.getText();
+        console.log(`Generating schema for interface ${name}...`);
+        const interface_schema = _generate_schema(program, name, 'interface');
+        schemas[name] = interface_schema;
+    }
+    return schemas;
+}
+function _generate_schema(program, name, category) {
+    const partial_args = {
+        ref: false
+    };
+    const tjs_schema = tjs.generateSchema(program, name, partial_args);
+    tjs_schema === null || tjs_schema === void 0 ? true : delete tjs_schema.$schema;
+    const schema = {
+        category,
+        ...tjs_schema
+    };
+    return schema;
+}
+function _get_types(source_file) {
+    return _get_syntax_kind(source_file, typescript_1.default.SyntaxKind.TypeAliasDeclaration);
+}
+function _get_interfaces(source_file) {
+    return _get_syntax_kind(source_file, typescript_1.default.SyntaxKind.InterfaceDeclaration);
+}
+function _get_syntax_kind(node, kind) {
+    const children = node.getChildren();
+    let nodes = [];
+    for (let i = 0; i < children.length; i++) {
+        const child = children[i];
+        if (child.kind === kind) {
+            log.trace(`Found ${typescript_1.default.SyntaxKind[kind]}: ${child.name.getText()}`);
+            nodes.push(child);
+        }
+        // Do not check types and interfaces inside namespaces.
+        // typescript-json-schema won't work with them
+        if (child.kind === typescript_1.default.SyntaxKind.ModuleDeclaration) {
+            continue;
+        }
+        const nested_nodes = _get_syntax_kind(child, kind);
+        nodes = nodes.concat(nested_nodes);
+    }
+    return nodes;
+}
 function _create_ts_program(options) {
     log.trace('Creating Typescript program...');
     let tsconfig_path = _get_default_tsconfig_path();

@@ -1,24 +1,16 @@
 /**
  *
- * Resolve module
+ * Generate module
  *
  */
-import * as c from '../config/index';
-export declare const atom_heritage_clause = "plutonio.atom";
-export type GenerateOptions = {
+type ReadOption = {
     tsconfig_path?: string;
 };
-export type AtomSchemaAttributeType = keyof typeof c.primitive_types;
-export type AtomSchemaAttribute = {
-    type: AtomSchemaAttributeType;
-    optional?: boolean;
-    unique?: boolean;
-    array?: boolean;
+export declare function read(options?: ReadOption): Map<string, Schemas>;
+type Schema = {
+    [k: string]: any;
 };
-export type AtomSchema = {
-    [k: string]: AtomSchemaAttribute;
+type Schemas = {
+    [k: string]: Schema;
 };
-export type AtomSchemas = {
-    [k: string]: AtomSchema;
-};
-export declare function read(options?: GenerateOptions): void;
+export {};

@@ -22,7 +22,9 @@
     "test": "yarn jest --coverage --verbose=false --silent",
     "dev:client": "yarn live-server client",
     "dev:base": "node -r dotenv/config ./dist/index.js",
+    "dev:base:tjs": "node -r dotenv/config ./dist/tjs/index.js",
     "dev:run": "yarn tsc-watch --onSuccess \"yarn dev:base\"",
+    "dev:tjs": "yarn tsc-watch --onSuccess \"yarn dev:base:tjs\"",
     "dev": "yarn tsc -w",
     "build": "yarn tsc -b"
   },
@@ -47,13 +49,14 @@
     "prettier": "2.8.7",
     "source-map-support": "^0.5.21",
     "ts-node": "^10.9.1",
-    "tsc-watch": "^6.0.0",
-    "typescript": "^4.9.4"
+    "tsc-watch": "^6.0.0"
   },
   "dependencies": {
     "chalk": "4",
     "commander": "^10.0.1",
     "dotenv": "^16.0.3",
-    "mongoose": "^7.1.0"
+    "mongoose": "^7.5.3",
+    "typescript": "~5.1.0",
+    "typescript-json-schema": "^0.61.0"
   }
 }
