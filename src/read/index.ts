@@ -47,21 +47,47 @@ function _resolve_schema_for(
   source_file: ts.SourceFile
 ): Schemas {
   const schemas: Schemas = {};
+  const import_declarations = _get_import_declaration(source_file);
+  for (const import_declaration of import_declarations) {
+    const import_parts = _generate_import(import_declaration);
+    console.log(import_parts);
+  }
   const types = _get_types(source_file);
   const interfaces = _get_interfaces(source_file);
   for (const t of types) {
     const name = t.name.getText();
     console.log(`Generating schema for type ${name}...`);
+    const full_text = t.getFullText();
     const type_schema = _generate_schema(program, name, 'type');
     schemas[name] = type_schema;
+    schemas[name].full_text = full_text;
   }
   for (const i of interfaces) {
     const name = i.name.getText();
     console.log(`Generating schema for interface ${name}...`);
+    const full_text = i.getFullText();
     const interface_schema = _generate_schema(program, name, 'interface');
     schemas[name] = interface_schema;
+    schemas[name].full_text = full_text;
+    schemas[name].extends = _get_heritage(i);
   }
   return schemas;
+}
+
+function _get_heritage(i: ts.InterfaceDeclaration) {
+  const heritage_clauses = _get_syntax_kind(
+    i,
+    ts.SyntaxKind.HeritageClause
+  ) as ts.HeritageClause[];
+  let expressions: ts.ExpressionWithTypeArguments[] = [];
+  for (const heritage_clause of heritage_clauses) {
+    const expression_with_typed_arguments = _get_syntax_kind(
+      heritage_clause,
+      ts.SyntaxKind.ExpressionWithTypeArguments
+    ) as ts.ExpressionWithTypeArguments[];
+    expressions = expressions.concat(expression_with_typed_arguments);
+  }
+  return expressions.map((e) => e.getText());
 }
 
 function _generate_schema(
@@ -102,9 +128,11 @@ function _get_syntax_kind(node: ts.Node, kind: ts.SyntaxKind) {
   for (let i = 0; i < children.length; i++) {
     const child = children[i];
     if (child.kind === kind) {
-      log.trace(
-        `Found ${ts.SyntaxKind[kind]}: ${(child as any).name.getText()}`
-      );
+      let any_child = child as any;
+      let name = any_child.name
+        ? any_child.name.getText()
+        : any_child.getText();
+      log.trace(`Found ${ts.SyntaxKind[kind]}: ${name}`);
       nodes.push(child);
     }
     // Do not check types and interfaces inside namespaces.
@@ -147,4 +175,75 @@ function _create_ts_program(options?: ReadOption) {
 
 function _get_default_tsconfig_path() {
   return './tsconfig.json';
+}
+
+function _get_import_declaration(source_file: ts.SourceFile) {
+  const children = source_file.getChildren()[0].getChildren(); // SyntaxList
+  const import_declarations: ts.ImportDeclaration[] = [];
+  for (let i = 0; i < children.length; i++) {
+    const child = children[i];
+    if (child.kind === ts.SyntaxKind.ImportDeclaration) {
+      log.trace(`Found ImportDeclaration: ${child.getText()}`);
+      import_declarations.push(child as ts.ImportDeclaration);
+    }
+  }
+  return import_declarations;
+}
+
+function _generate_import(import_node: ts.ImportDeclaration) {
+  const text = import_node.getText();
+  const module = import_node.moduleSpecifier
+    .getText()
+    .replaceAll("'", '')
+    .replaceAll('"', '');
+
+  // import * as plutonio from 'plutonio'
+  const namespace_imports = _get_syntax_kind(
+    import_node,
+    ts.SyntaxKind.NamespaceImport
+  ) as ts.NamespaceImport[];
+  if (namespace_imports.length > 0) {
+    const namespace_import = namespace_imports[0];
+    const identifiers = _get_syntax_kind(
+      namespace_import,
+      ts.SyntaxKind.Identifier
+    ) as ts.Identifier[];
+    const identifier = identifiers[0];
+    const clause = identifier.getText();
+    return {
+      text,
+      module,
+      clause,
+      specifiers: [],
+    };
+  }
+
+  // import {atom} from 'plutonio'
+  const import_specifiers = _get_syntax_kind(
+    import_node,
+    ts.SyntaxKind.ImportSpecifier
+  ) as ts.ImportSpecifier[];
+  if (import_specifiers.length > 0) {
+    const specifiers = import_specifiers.map((is) => is.getText());
+    return {
+      text,
+      module,
+      clause: '',
+      specifiers,
+    };
+  }
+
+  // import plutonio from 'plutonio'
+  const import_clauses = _get_syntax_kind(
+    import_node,
+    ts.SyntaxKind.ImportClause
+  ) as ts.ImportClause[];
+  const import_clause = import_clauses[0];
+  const clause = import_clause.getText();
+  return {
+    text,
+    module,
+    clause,
+    specifiers: [],
+  };
 }
