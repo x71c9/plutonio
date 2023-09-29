@@ -271,6 +271,16 @@ function _update_properties(node: ts.Node, schema: Schema): Schema {
     if (!prop_signature) {
       continue;
     }
+    const type_operators = _get_syntax_kind(
+      prop_signature,
+      ts.SyntaxKind.TypeOperator
+    );
+    if (type_operators.length > 0) {
+      const type_op = type_operators[0];
+      // TODO: FIX
+      (prop_def as any).original = type_op.getText();
+      return schema;
+    }
     const type_references = _get_syntax_kind(
       prop_signature,
       ts.SyntaxKind.TypeReference

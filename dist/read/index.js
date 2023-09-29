@@ -230,6 +230,13 @@ function _update_properties(node, schema) {
         if (!prop_signature) {
             continue;
         }
+        const type_operators = _get_syntax_kind(prop_signature, typescript_1.default.SyntaxKind.TypeOperator);
+        if (type_operators.length > 0) {
+            const type_op = type_operators[0];
+            // TODO: FIX
+            prop_def.original = type_op.getText();
+            return schema;
+        }
         const type_references = _get_syntax_kind(prop_signature, typescript_1.default.SyntaxKind.TypeReference);
         if (type_references.length === 0) {
             continue;
