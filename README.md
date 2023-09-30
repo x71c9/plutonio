@@ -3,53 +3,55 @@
 Plutonio is a Typescript library that scan your typescript project and generate
 a schema of all types and interfaces of the project.
 
-The schema is in the following format:
+The schema is the following:
 
 ```typescript
-type Primitive =
-  | 'boolean'
-  | 'number'
-  | 'string'
-  | 'object'
-  | 'undefined'
-  | 'null'
-  | 'any';
-
-type Properties = {
-  [k: string]: {
-    type: Primitive;
-    text: string;
-    properties?: Properties;
+type Schema = {
+  [file_path: string]: {
+    imports?: Import[];
+    interfaces?: {
+      [name: string]: {
+        extends: string[];
+        full_text: string;
+        properties: Properties;
+        type: Primitive;
+      };
+    };
+    types?: {
+      [name: string]: {
+        full_text: string;
+        properties: Properties;
+        type: Primitive;
+      };
+    };
   };
 };
 
 type Import = {
-  text: string;
-  module: string;
   clause: string;
+  module: string;
   specifiers: string[];
+  text: string;
 };
 
-type Schema = {
-  [file_path: string]: {
-    types?: {
-      [name: string]: {
-        type: Primitive;
-        full_text: string;
-        properties: Properties;
-      };
-    };
-    interfaces?: {
-      [name: string]: {
-        type: Primitive;
-        full_text: string;
-        properties: Properties;
-        extends: string[];
-      };
-    };
-    imports?: Import[];
+type Properties = {
+  [k: string]: {
+    enum?: string[];
+    original?: string;
+    properties?: Properties;
+    type: Primitive;
   };
 };
+
+type Primitive =
+  | 'any';
+  | 'boolean'
+  | 'null'
+  | 'number'
+  | 'object'
+  | 'string'
+  | 'undefined'
+
 ```
 
 An example of a schema is the following:
@@ -59,7 +61,8 @@ const schema = {
   'src/index.ts': {
     interfaces: {
       Product: {
-        type: 'object',
+        full_text:
+          'export interface Product extends Foo.Boo {title: string, price: number}',
         properties: {
           title: {
             type: 'string',
@@ -68,8 +71,7 @@ const schema = {
             type: 'number',
           },
         },
-        full_text:
-          'export interface Product extends Foo.Boo {title: string, price: number}',
+        type: 'object',
       },
     },
     imports: [

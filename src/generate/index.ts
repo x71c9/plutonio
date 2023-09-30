@@ -1,288 +1,358 @@
 /**
  *
- * Generate module
+ * Generate index module
+ *
+ * @packageDocumentation
  *
  */
 
-import ts from 'typescript';
 import path from 'path';
+import ts from 'typescript';
+import * as tjs from 'typescript-json-schema';
+import * as types from '../types/index.js';
+import * as utils from '../utils/index.js';
 
-import * as log from '../log/index';
-import * as c from '../config/index';
-
-export const atom_heritage_clause = 'plutonio.atom';
-
-export type GenerateOptions = {
-  tsconfig_path?: string;
+type GenerateOptions = {
+  tsconfig_path: string;
 };
 
-export type AtomSchemaAttributeType = keyof typeof c.primitive_types;
-
-export type AtomSchemaAttribute = {
-  type: AtomSchemaAttributeType;
-  optional?: boolean;
-  unique?: boolean;
-  array?: boolean;
-};
-
-export type AtomSchema = {
-  [k: string]: AtomSchemaAttribute;
-};
-
-export type AtomSchemas = {
-  [k: string]: AtomSchema;
-};
-
-export function generate(options?: GenerateOptions) {
-  log.trace('Generating...');
-  const {program, checker} = _create_ts_program(options);
-  const plutonio_source_files_map = _select_plutonio_source_files(program);
-  const atom_schemas = _generate_atom_schemas(
-    checker,
-    plutonio_source_files_map
-  );
-  return atom_schemas;
+export function generate(
+  options?: Partial<GenerateOptions>
+): types.ProjectSchema {
+  const program = _create_ts_program(options);
+  const project_schema = _generate_project_schema(program);
+  return project_schema;
 }
 
-function _generate_atom_schemas(
-  checker: ts.TypeChecker,
-  source_file_map: Map<ts.SourceFile, string>
-): AtomSchemas {
-  log.trace(`Generating atom schemas from plutonio source files...`);
-  const interfaces_map = _select_inherited_atom_interfaces(source_file_map);
-  const atom_schemas = _generate_atom_schemas_from_interface_nodes(
-    checker,
-    interfaces_map
-  );
-  return atom_schemas;
-}
-
-function _generate_atom_schemas_from_interface_nodes(
-  checker: ts.TypeChecker,
-  interfaces_map: Map<ts.InterfaceDeclaration, string>
-): AtomSchemas {
-  const atom_schemas: AtomSchemas = {};
-  for (const [interf, plutonio_name] of interfaces_map) {
-    const {atom_name, atom_schema} = _generate_atom_schema(
-      checker,
-      interf,
-      plutonio_name
-    );
-    atom_schemas[atom_name] = atom_schema;
-  }
-  return atom_schemas;
-}
-
-function _select_inherited_atom_interfaces(
-  source_file_map: Map<ts.SourceFile, string>
-): Map<ts.InterfaceDeclaration, string> {
-  log.trace(`Selecting inherited atom interfaces...`);
-  const interfaces_map = new Map<ts.InterfaceDeclaration, string>();
-  for (const [source_file, plutonio_name] of source_file_map) {
-    log.trace(source_file.fileName);
-    ts.forEachChild(source_file, _visit_node);
-    function _visit_node(node: ts.Node) {
-      if (_is_inherited_atom_interface_node(node)) {
-        log.debug(`Added node: ${node.name.getText()}`);
-        interfaces_map.set(node, plutonio_name);
-      }
-      ts.forEachChild(node, _visit_node);
-    }
-  }
-  return interfaces_map;
-}
-
-function _select_plutonio_source_files(
-  program: ts.Program
-): Map<ts.SourceFile, string> {
-  log.trace('Selecting SourceFile with imported Plutonio...');
-  const plutonio_source_files_map: Map<ts.SourceFile, string> = new Map();
-  for (const source_file of program.getSourceFiles()) {
+function _generate_project_schema(program: ts.Program): types.ProjectSchema {
+  const project_schema: types.ProjectSchema = {};
+  const source_files = program.getSourceFiles();
+  for (const source_file of source_files) {
     if (source_file.isDeclarationFile) {
       continue;
     }
-    log.trace(source_file.fileName);
-    ts.forEachChild(source_file, _visit_node);
+    project_schema[source_file.fileName] = _resolve_file_schema(
+      program,
+      source_file
+    );
   }
-  function _visit_node(node: ts.Node) {
-    if (ts.isImportDeclaration(node)) {
-      const module_specifier = node.moduleSpecifier
-        .getText()
-        .replaceAll("'", '')
-        .replaceAll('"', '');
-      if (module_specifier === c.plutonio_package_name) {
-        const source_file = node.getSourceFile();
-        const import_clause = node.importClause?.getText();
-        if (typeof import_clause === 'string' && import_clause !== '') {
-          const splitted_import = import_clause.split(' ');
-          const plutonio_name = splitted_import[splitted_import.length - 1];
-          plutonio_source_files_map.set(source_file, plutonio_name);
-        }
-      }
-    }
-    ts.forEachChild(node, _visit_node);
-  }
-  return plutonio_source_files_map;
+  return project_schema;
 }
 
-function _generate_atom_schema(
-  checker: ts.TypeChecker,
-  interf: ts.InterfaceDeclaration,
-  plutonio_name: string
-) {
-  const name = interf.name.getText();
-  const atom_name = _transform_atom_name(name);
-  /**
-   * Type is needed so that it gets also
-   * all the inherited properties
-   */
-  const type = checker.getTypeAtLocation(interf);
-  const properties = type.getProperties();
-  const atom_schema: AtomSchema = {};
-  for (const property of properties) {
-    const attribute_name = property.getName();
-    if (c.inherited_atom_properties.includes(attribute_name)) {
+function _resolve_file_schema(
+  program: ts.Program,
+  source_file: ts.SourceFile
+): types.FileSchema {
+  const file_schema: types.FileSchema = {
+    imports: _resolve_imports(source_file),
+    interfaces: _resolve_interfaces(program, source_file),
+    types: _resolve_types(program, source_file),
+  };
+  return utils.no_undefined(file_schema);
+}
+
+function _resolve_imports(
+  source_file: ts.SourceFile
+): types.Import[] | undefined {
+  const imports: types.Import[] = [];
+  const import_declarations: ts.ImportDeclaration[] = _get_nested_of_type(
+    source_file,
+    ts.SyntaxKind.ImportDeclaration
+  );
+  for (const import_declaration of import_declarations) {
+    const import_parts = _generate_import_schema(import_declaration);
+    imports.push(import_parts);
+  }
+  if (imports.length === 0) {
+    return undefined;
+  }
+  return imports;
+}
+
+function _generate_import_schema(
+  import_node: ts.ImportDeclaration
+): types.Import {
+  const text = import_node.getText();
+  const module = import_node.moduleSpecifier
+    .getText()
+    .replaceAll("'", '')
+    .replaceAll('"', '');
+  // import * as plutonio from 'plutonio'
+  const namespace_imports = _get_nested_of_type(
+    import_node,
+    ts.SyntaxKind.NamespaceImport
+  ) as ts.NamespaceImport[];
+  if (namespace_imports.length > 0 && namespace_imports[0]) {
+    const namespace_import = namespace_imports[0];
+    const identifiers = _get_nested_of_type(
+      namespace_import,
+      ts.SyntaxKind.Identifier
+    ) as ts.Identifier[];
+    const identifier = identifiers[0];
+    if (!identifier) {
+      throw new Error(`Missing identifier in namespace import`);
+    }
+    const clause = identifier.getText();
+    return {
+      text,
+      module,
+      clause,
+      specifiers: [],
+    };
+  }
+  // import {atom} from 'plutonio'
+  const import_specifiers = _get_nested_of_type(
+    import_node,
+    ts.SyntaxKind.ImportSpecifier
+  ) as ts.ImportSpecifier[];
+  if (import_specifiers.length > 0) {
+    const specifiers = import_specifiers.map((is) => is.getText());
+    return {
+      text,
+      module,
+      clause: '',
+      specifiers,
+    };
+  }
+  // import plutonio from 'plutonio'
+  const import_clauses = _get_nested_of_type(
+    import_node,
+    ts.SyntaxKind.ImportClause
+  ) as ts.ImportClause[];
+  const import_clause = import_clauses[0];
+  if (!import_clause) {
+    throw new Error(`Missing import clause`);
+  }
+  const clause = import_clause.getText();
+  return {
+    text,
+    module,
+    clause,
+    specifiers: [],
+  };
+}
+
+function _resolve_interfaces(
+  program: ts.Program,
+  source_file: ts.SourceFile
+): types.Interfaces | undefined {
+  const interfaces: types.Interfaces = {};
+  const interface_nodes = _get_nested_of_type<ts.InterfaceDeclaration>(
+    source_file,
+    ts.SyntaxKind.InterfaceDeclaration
+  );
+  if (interface_nodes.length === 0) {
+    return undefined;
+  }
+  for (const interface_node of interface_nodes) {
+    const name = interface_node.name.getText();
+    interfaces[name] = _generate_interface_schema(
+      program,
+      name,
+      interface_node
+    );
+  }
+  return interfaces;
+}
+
+function _generate_interface_schema(
+  program: ts.Program,
+  name: string,
+  interface_node: ts.InterfaceDeclaration
+): types.Interface {
+  const full_text = interface_node.getFullText();
+  const tjs_schema = _tjs_schema(program, name);
+  if (!tjs_schema) {
+    throw new Error(`Cannot generate schema for interface '${name}'`);
+  }
+  let properties = _resolve_properties(tjs_schema);
+  if (properties) {
+    properties = _update_properties(properties, interface_node);
+  }
+  const interface_schema = {
+    extends: _resolve_extends(interface_node),
+    full_text,
+    properties,
+    type: _resolve_type(tjs_schema, name),
+  };
+  return utils.no_undefined(interface_schema);
+}
+
+function _generate_type_schema(
+  program: ts.Program,
+  name: string,
+  type_node: ts.TypeAliasDeclaration
+): types.Type {
+  const full_text = type_node.getFullText();
+  const tjs_schema = _tjs_schema(program, name);
+  if (!tjs_schema) {
+    throw new Error(`Cannot generate schema for type '${name}'`);
+  }
+  let properties = _resolve_properties(tjs_schema);
+  if (properties) {
+    properties = _update_properties(properties, type_node);
+  }
+  const type_schema = {
+    full_text,
+    properties,
+    type: _resolve_type(tjs_schema, name),
+  };
+  return utils.no_undefined(type_schema);
+}
+
+function _resolve_extends(interface_node: ts.InterfaceDeclaration): string[] {
+  const heritage_clauses = _get_nested_of_type(
+    interface_node,
+    ts.SyntaxKind.HeritageClause
+  ) as ts.HeritageClause[];
+  let expressions: ts.ExpressionWithTypeArguments[] = [];
+  for (const heritage_clause of heritage_clauses) {
+    const expression_with_typed_arguments = _get_nested_of_type(
+      heritage_clause,
+      ts.SyntaxKind.ExpressionWithTypeArguments
+    ) as ts.ExpressionWithTypeArguments[];
+    expressions = expressions.concat(expression_with_typed_arguments);
+  }
+  return expressions.map((e) => e.getText());
+}
+
+function _update_properties(
+  properties: types.Properties,
+  node: ts.Node
+): types.Properties {
+  const property_signatures = _get_nested_of_type(
+    node,
+    ts.SyntaxKind.PropertySignature
+  ) as ts.PropertySignature[];
+  const prop_signature_map = new Map<string, ts.PropertySignature>();
+  for (const prop_sign of property_signatures) {
+    const identifiers = _get_nested_of_type(
+      prop_sign,
+      ts.SyntaxKind.Identifier
+    ) as ts.Identifier[];
+    const identifier = identifiers[0];
+    if (!identifier) {
+      throw new Error('Missing identifier for property signature');
+    }
+    const prop_name = identifier.getText();
+    prop_signature_map.set(prop_name, prop_sign);
+  }
+  for (const [prop_name, prop_def] of Object.entries(properties)) {
+    const prop_signature = prop_signature_map.get(prop_name);
+    if (!prop_signature) {
       continue;
     }
-    atom_schema[attribute_name] = _generate_atom_schema_attribute(
-      checker,
-      interf,
-      property,
-      plutonio_name
+    const type_operators = _get_nested_of_type(
+      prop_signature,
+      ts.SyntaxKind.TypeOperator
     );
-  }
-  return {atom_name, atom_schema};
-}
-
-function _generate_atom_schema_attribute(
-  checker: ts.TypeChecker,
-  interf: ts.InterfaceDeclaration,
-  property: ts.Symbol,
-  plutonio_name: string
-): AtomSchemaAttribute {
-  const property_type = checker.getTypeOfSymbolAtLocation(property, interf);
-  const mapped_type = _map_type(checker, property_type);
-  const type_string = checker.typeToString(property_type);
-  // console.log("g", type_string);
-  if (!mapped_type) {
-    throw new Error(`Invalid Plutonio attribute type '${type_string}'`);
-  }
-  const atom_schema_attribute: AtomSchemaAttribute = {
-    type: mapped_type,
-  };
-  if (_has_undefined(property_type)) {
-    atom_schema_attribute.optional = true;
-  }
-  if (_atom_schema_attribute_is_unique(checker, property, plutonio_name)) {
-    atom_schema_attribute.unique = true;
-  }
-  if (_is_array_type(property_type)) {
-    atom_schema_attribute.array = true;
-  }
-  return atom_schema_attribute;
-}
-
-function _map_type(
-  checker: ts.TypeChecker,
-  type: ts.Type
-): AtomSchemaAttributeType | undefined {
-  const type_string = checker.typeToString(type);
-  const removed_undefined = type_string.replaceAll(' | undefined', '');
-  const removed_array_brackets = removed_undefined
-    .replaceAll('[', '')
-    .replaceAll(']', '');
-  const lower_removed_undefined = removed_array_brackets.toLowerCase();
-  // console.log("map", type_string, removed_undefined, removed_array_brackets, lower_removed_undefined);
-  if (lower_removed_undefined in c.primitive_types) {
-    // string, number, boolean, date
-    return lower_removed_undefined as AtomSchemaAttributeType;
-  }
-  if (type.isStringLiteral()) {
-    return 'string';
-  } else if (type.isNumberLiteral()) {
-    return 'number';
-  } else if (type.isUnion()) {
-    const types = type.types.map((t) => _map_type(checker, t));
-    const defined_types = types.filter((t) => t !== undefined);
-    if (
-      defined_types.length > 1 &&
-      !defined_types.every((t) => t === defined_types[0])
-    ) {
-      throw new Error(`Union of different types is not allowed`);
+    if (type_operators.length > 0 && type_operators[0]) {
+      const type_op = type_operators[0];
+      // TODO: FIX
+      (prop_def as any).original = type_op.getText();
+      return properties;
     }
-    if (defined_types.length === 0) {
-      return undefined;
-    }
-    return defined_types[0];
-  }
-  return undefined;
-}
-
-function _is_array_type(type: ts.Type): boolean {
-  if (type.isUnion()) {
-    const is_array_types = type.types.map((t) => _is_array_type(t));
-    const count = is_array_types.reduce(
-      (acc, curr) => (curr ? acc + 1 : acc),
-      0
+    const type_references = _get_nested_of_type(
+      prop_signature,
+      ts.SyntaxKind.TypeReference
     );
-    if (count > is_array_types.length - 2) {
-      return true;
+    if (type_references.length === 0 || !type_references[0]) {
+      continue;
+    }
+    const type_ref = type_references[0];
+    // TODO: FIX
+    (prop_def as any).original = type_ref.getText();
+  }
+  return properties;
+}
+
+function _resolve_type(
+  tjs_schema: tjs.Definition,
+  name: string
+): types.Primitive {
+  const type = tjs_schema?.type;
+  if (!type) {
+    throw new Error(`Cannot resolve 'type' for '${name}'`);
+  }
+  switch (type) {
+    case 'string': {
+      return 'string';
+    }
+    case 'number': {
+      return 'number';
+    }
+    case 'boolean': {
+      return 'boolean';
+    }
+    case 'object': {
+      return 'object';
+    }
+    case 'integer': {
+      return 'number';
+    }
+    case 'null': {
+      return 'null';
+    }
+    case 'array': {
+      return 'array';
     }
   }
-  const value_declaration_text = type.getSymbol()?.valueDeclaration?.getText();
-  return value_declaration_text?.includes('ArrayConstructor') === true;
+  return 'undefined';
 }
 
-function _has_undefined(type: ts.Type): boolean {
-  if (type.isUnion() && type.types.some(_has_undefined)) {
-    return true;
-  } else if ((type as any).intrinsicName === 'undefined') {
-    // TODO Better implementation
-    return true;
+function _resolve_properties(
+  tjs_schema: tjs.Definition
+): types.Properties | undefined {
+  const tjs_properties = tjs_schema.properties;
+  if (!tjs_properties) {
+    return undefined;
   }
-  return false;
+  const properties: types.Properties = {};
+  for (const [key, value] of Object.entries(tjs_properties)) {
+    if (typeof value === 'boolean') {
+      continue;
+    }
+    const property: types.Property = {
+      enum: _resolve_enum(value.enum),
+      type: _resolve_type(value, key),
+      properties: _resolve_properties(value),
+    };
+    properties[key] = utils.no_undefined(property);
+  }
+  if (Object.keys(properties).length === 0) {
+    return undefined;
+  }
+  return properties;
 }
 
-function _atom_schema_attribute_is_unique(
-  _checker: ts.TypeChecker,
-  prop: ts.Symbol,
-  plutonio_name: string
-): boolean {
-  const declaration_text = prop.valueDeclaration?.getText();
-  if (declaration_text?.includes(`${plutonio_name}.${c.unique_type_name}`)) {
-    return true;
+function _resolve_enum(tjs_enum?: unknown[]): types.Primitive[] | undefined {
+  if (!tjs_enum) {
+    return undefined;
   }
-  return false;
+  // TODO Check all possibilities
+  return tjs_enum as types.Primitive[];
 }
 
-function _transform_atom_name(name: string): string {
-  return name.toLowerCase();
+function _resolve_types(
+  program: ts.Program,
+  source_file: ts.SourceFile
+): types.Types | undefined {
+  const types: types.Types = {};
+  const type_nodes = _get_nested_of_type<ts.TypeAliasDeclaration>(
+    source_file,
+    ts.SyntaxKind.TypeAliasDeclaration
+  );
+  if (type_nodes.length === 0) {
+    return undefined;
+  }
+  for (const type_node of type_nodes) {
+    const name = type_node.name.getText();
+    types[name] = _generate_type_schema(program, name, type_node);
+  }
+  return types;
 }
 
-function _is_inherited_atom_interface_node(
-  node: ts.Node
-): node is ts.InterfaceDeclaration {
-  if (!ts.isInterfaceDeclaration(node)) {
-    return false;
-  }
-  const heritage_clause = node.heritageClauses?.[0];
-  if (!heritage_clause) {
-    return false;
-  }
-  const heritage_children = heritage_clause.getChildren();
-  const heritage_first_child = heritage_children?.[0];
-  if (!heritage_first_child) {
-    return false;
-  }
-  const heritage_text = heritage_clause.getText();
-  if (heritage_text.includes(atom_heritage_clause)) {
-    return true;
-  }
-  return false;
-}
-
-function _create_ts_program(options?: GenerateOptions) {
-  log.trace('Creating Typescript program...');
+function _create_ts_program(options?: Partial<GenerateOptions>) {
   let tsconfig_path = _get_default_tsconfig_path();
   if (
     typeof options?.tsconfig_path === 'string' &&
@@ -304,10 +374,47 @@ function _create_ts_program(options?: GenerateOptions) {
     options: compilerOptions,
   };
   const program = ts.createProgram(create_program_options);
-  const checker = program.getTypeChecker();
-  return {program, checker};
+  return program;
 }
 
 function _get_default_tsconfig_path() {
   return './tsconfig.json';
+}
+
+function _get_nested_of_type<T extends ts.Node>(
+  node: ts.Node,
+  kind: ts.SyntaxKind
+): T[] {
+  const children = node.getChildren();
+  let nodes: T[] = [];
+  for (let i = 0; i < children.length; i++) {
+    const child = children[i];
+    if (!child) {
+      continue;
+    }
+    if (child.kind === kind) {
+      // let any_child = child as any;
+      // let name = any_child.name
+      //   ? any_child.name.getText()
+      //   : any_child.getText();
+      nodes.push(child as T);
+    }
+    // Do not check types and interfaces inside namespaces.
+    // typescript-json-schema won't work with them
+    if (child.kind === ts.SyntaxKind.ModuleDeclaration) {
+      continue;
+    }
+    const nested_nodes = _get_nested_of_type(child, kind);
+    nodes = nodes.concat(nested_nodes as T[]);
+  }
+  return nodes;
+}
+
+function _tjs_schema(program: ts.Program, name: string) {
+  const partial_args = {
+    ref: false,
+  };
+  const tjs_schema = tjs.generateSchema(program, name, partial_args);
+  delete tjs_schema?.$schema;
+  return tjs_schema;
 }

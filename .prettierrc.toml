@@ -2,4 +2,3 @@ singleQuote = true
 bracketSpacing = false
 useTabs = false
 quoteProps = "consistent"
-tabWidth = 2
