@@ -12,5 +12,3 @@ const options = {
 };
 const project_schema = plutonio.generate(options);
 console.log(project_schema);
-
-// plutonio.read();
