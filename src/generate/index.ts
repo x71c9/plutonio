@@ -8,6 +8,7 @@
 
 import path from 'path';
 import ts from 'typescript';
+import {ion} from '../log/index.js';
 import * as tjs from 'typescript-json-schema';
 import * as types from '../types/index.js';
 import * as utils from '../utils/index.js';
@@ -31,6 +32,8 @@ function _generate_project_schema(program: ts.Program): types.ProjectSchema {
     if (source_file.isDeclarationFile) {
       continue;
     }
+    const file_name = source_file.fileName;
+    ion.trace(`Parsing: ${file_name}`);
     project_schema[source_file.fileName] = _resolve_file_schema(
       program,
       source_file
@@ -54,6 +57,7 @@ function _resolve_file_schema(
 function _resolve_imports(
   source_file: ts.SourceFile
 ): types.Import[] | undefined {
+  ion.trace(`Resolving imports...`);
   const imports: types.Import[] = [];
   const import_declarations: ts.ImportDeclaration[] = _get_nested_of_type(
     source_file,
@@ -136,6 +140,7 @@ function _resolve_interfaces(
   program: ts.Program,
   source_file: ts.SourceFile
 ): types.Interfaces | undefined {
+  ion.trace(`Resolving interfaces...`);
   const interfaces: types.Interfaces = {};
   const interface_nodes = _get_nested_of_type<ts.InterfaceDeclaration>(
     source_file,
@@ -337,6 +342,7 @@ function _resolve_types(
   program: ts.Program,
   source_file: ts.SourceFile
 ): types.Types | undefined {
+  ion.trace(`Resolving types...`);
   const types: types.Types = {};
   const type_nodes = _get_nested_of_type<ts.TypeAliasDeclaration>(
     source_file,
@@ -374,6 +380,10 @@ function _create_ts_program(options?: Partial<GenerateOptions>) {
     options: compilerOptions,
   };
   const program = ts.createProgram(create_program_options);
+  // .getTypeChcker needs to be called otherwise
+  // when searching nested nodes, the nodes have no
+  // SourceFile attached to and the system fails
+  program.getTypeChecker();
   return program;
 }
 

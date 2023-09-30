@@ -7,6 +7,10 @@ const config: Partial<Config.InitialOptions> = {
   transform: {
     '^.+\\.tsx?$': 'ts-jest',
   },
+  moduleFileExtensions: ['js', 'jsx', 'ts', 'tsx', 'json'],
+  moduleNameMapper: {
+    '^(.*)\\.js$': '$1',
+  },
   transformIgnorePatterns: ['<rootDir>/node_modules/'],
   reporters: [
     'default',
