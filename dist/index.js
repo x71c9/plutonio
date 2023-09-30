@@ -9,5 +9,5 @@ const options = {
     tsconfig_path: '/home/x71c9/repos/plutonio/builder/tsconfig.json',
 };
 const project_schema = plutonio.generate(options);
-console.log(project_schema);
+console.log(JSON.stringify(project_schema, null, 2));
 //# sourceMappingURL=index.js.map
