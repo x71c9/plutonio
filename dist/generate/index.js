@@ -106,7 +106,10 @@ function _resolve_interfaces(program, source_file) {
     }
     for (const interface_node of interface_nodes) {
         const name = interface_node.name.getText();
-        interfaces[name] = _generate_interface_schema(program, name, interface_node);
+        const generated_schema = _generate_interface_schema(program, name, interface_node);
+        if (generated_schema) {
+            interfaces[name];
+        }
     }
     return interfaces;
 }
@@ -114,7 +117,8 @@ function _generate_interface_schema(program, name, interface_node) {
     const full_text = interface_node.getFullText();
     const tjs_schema = _tjs_schema(program, name);
     if (!tjs_schema) {
-        throw new Error(`Cannot generate schema for interface '${name}'`);
+        return undefined;
+        // throw new Error(`Cannot generate schema for interface '${name}'`);
     }
     let properties = _resolve_properties(tjs_schema);
     if (properties) {
@@ -125,14 +129,18 @@ function _generate_interface_schema(program, name, interface_node) {
         full_text,
         properties,
         type: _resolve_type(tjs_schema, name),
+        items: _resolve_items(tjs_schema),
     };
     return utils.no_undefined(interface_schema);
 }
 function _generate_type_schema(program, name, type_node) {
     const full_text = type_node.getFullText();
     const tjs_schema = _tjs_schema(program, name);
+    // console.log(`NAME: ${name}`);
+    // console.log(`TJS: `, tjs_schema);
     if (!tjs_schema) {
-        throw new Error(`Cannot generate schema for type '${name}'`);
+        return undefined;
+        // throw new Error(`Cannot generate schema for type '${name}'`);
     }
     let properties = _resolve_properties(tjs_schema);
     if (properties) {
@@ -142,6 +150,7 @@ function _generate_type_schema(program, name, type_node) {
         full_text,
         properties,
         type: _resolve_type(tjs_schema, name),
+        items: _resolve_items(tjs_schema),
     };
     return utils.no_undefined(type_schema);
 }
@@ -218,6 +227,13 @@ function _resolve_type(tjs_schema, name) {
     }
     return 'undefined';
 }
+function _resolve_items(tjs_schema) {
+    const items = tjs_schema === null || tjs_schema === void 0 ? void 0 : tjs_schema.items;
+    if (!items || typeof items === 'boolean') {
+        return undefined;
+    }
+    return items;
+}
 function _resolve_properties(tjs_schema) {
     const tjs_properties = tjs_schema.properties;
     if (!tjs_properties) {
@@ -256,7 +272,10 @@ function _resolve_types(program, source_file) {
     }
     for (const type_node of type_nodes) {
         const name = type_node.name.getText();
-        types[name] = _generate_type_schema(program, name, type_node);
+        const generated_schema = _generate_type_schema(program, name, type_node);
+        if (generated_schema) {
+            types[name] = generated_schema;
+        }
     }
     return types;
 }
@@ -314,8 +333,19 @@ function _tjs_schema(program, name) {
     const partial_args = {
         ref: false,
     };
-    const tjs_schema = tjs.generateSchema(program, name, partial_args);
-    tjs_schema === null || tjs_schema === void 0 ? true : delete tjs_schema.$schema;
-    return tjs_schema;
+    try {
+        const tjs_schema = tjs.generateSchema(program, name, partial_args);
+        if (!tjs_schema) {
+            return undefined;
+        }
+        tjs_schema === null || tjs_schema === void 0 ? true : delete tjs_schema.$schema;
+        return tjs_schema;
+    }
+    catch (e) {
+        const err = e;
+        const error_message = ('message' in err) ? err.message : '';
+        ion.warn(`TJS failed`, error_message);
+        return undefined;
+    }
 }
 //# sourceMappingURL=index.js.map

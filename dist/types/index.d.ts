@@ -35,6 +35,10 @@ export type Type = {
     full_text: string;
     properties: Properties;
     type: Primitive;
+    items?: Items;
+};
+export type Items = {
+    type: Primitive | Primitive[];
 };
 export type Properties = {
     [k: string]: Property;
@@ -45,4 +49,4 @@ export type Property = {
     properties?: Properties;
     type: Primitive;
 };
-export type Primitive = 'any' | 'boolean' | 'null' | 'number' | 'object' | 'string' | 'undefined' | 'array';
+export type Primitive = 'any' | 'array' | 'boolean' | 'null' | 'number' | 'object' | 'string' | 'undefined';

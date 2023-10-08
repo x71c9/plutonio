@@ -42,6 +42,11 @@ export type Type = {
   full_text: string;
   properties: Properties;
   type: Primitive;
+  items?: Items;
+};
+
+export type Items = {
+  type: Primitive | Primitive[];
 };
 
 export type Properties = {
@@ -57,10 +62,10 @@ export type Property = {
 
 export type Primitive =
   | 'any'
+  | 'array'
   | 'boolean'
   | 'null'
   | 'number'
   | 'object'
   | 'string'
-  | 'undefined'
-  | 'array';
+  | 'undefined';
