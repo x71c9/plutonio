@@ -343,7 +343,7 @@ function _tjs_schema(program, name) {
     }
     catch (e) {
         const err = e;
-        const error_message = ('message' in err) ? err.message : '';
+        const error_message = 'message' in err ? err.message : '';
         ion.warn(`TJS failed`, error_message);
         return undefined;
     }
