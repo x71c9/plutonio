@@ -8,14 +8,15 @@
 import path from 'path';
 import ts from 'typescript';
 import { ion } from '../log/index.js';
-import * as tjs from 'typescript-json-schema';
+import * as tjsg from 'ts-json-schema-generator';
 import * as utils from '../utils/index.js';
 export function generate(options) {
-    const program = _create_ts_program(options);
-    const project_schema = _generate_project_schema(program);
+    const tsconfig_path = _resolve_tsconfig_path(options === null || options === void 0 ? void 0 : options.tsconfig_path);
+    const program = _create_ts_program(tsconfig_path);
+    const project_schema = _generate_project_schema(program, tsconfig_path);
     return project_schema;
 }
-function _generate_project_schema(program) {
+function _generate_project_schema(program, tsconfig_path) {
     const project_schema = {};
     const source_files = program.getSourceFiles();
     for (const source_file of source_files) {
@@ -24,15 +25,15 @@ function _generate_project_schema(program) {
         }
         const file_name = source_file.fileName;
         ion.trace(`Parsing: ${file_name}`);
-        project_schema[source_file.fileName] = _resolve_file_schema(program, source_file);
+        project_schema[source_file.fileName] = _resolve_file_schema(tsconfig_path, source_file);
     }
     return project_schema;
 }
-function _resolve_file_schema(program, source_file) {
+function _resolve_file_schema(tsconfig_path, source_file) {
     const file_schema = {
         imports: _resolve_imports(source_file),
-        interfaces: _resolve_interfaces(program, source_file),
-        types: _resolve_types(program, source_file),
+        interfaces: _resolve_interfaces(tsconfig_path, source_file),
+        types: _resolve_types(tsconfig_path, source_file),
     };
     return utils.no_undefined(file_schema);
 }
@@ -97,30 +98,32 @@ function _generate_import_schema(import_node) {
         specifiers: [],
     };
 }
-function _resolve_interfaces(program, source_file) {
+function _resolve_interfaces(tsconfig_path, source_file) {
     ion.trace(`Resolving interfaces...`);
     const interfaces = {};
     const interface_nodes = _get_nested_of_type(source_file, ts.SyntaxKind.InterfaceDeclaration);
     if (interface_nodes.length === 0) {
         return undefined;
     }
+    const file_path = source_file.fileName;
     for (const interface_node of interface_nodes) {
         const name = interface_node.name.getText();
-        const generated_schema = _generate_interface_schema(program, name, interface_node);
+        ion.trace(`Resolving interface for '${name}'...`);
+        const generated_schema = _generate_interface_schema(tsconfig_path, file_path, name, interface_node);
         if (generated_schema) {
             interfaces[name];
         }
     }
     return interfaces;
 }
-function _generate_interface_schema(program, name, interface_node) {
+function _generate_interface_schema(tsconfig_path, file_path, name, interface_node) {
     const full_text = interface_node.getFullText();
-    const tjs_schema = _tjs_schema(program, name);
-    if (!tjs_schema) {
-        return undefined;
-        // throw new Error(`Cannot generate schema for interface '${name}'`);
+    const tjsg_schema = _tjsg_schema(tsconfig_path, file_path, name);
+    if (!tjsg_schema) {
+        throw new Error(`Cannot generate schema for interface '${name}'`);
     }
-    let properties = _resolve_properties(tjs_schema);
+    // let properties = _resolve_properties(tjsg_schema, name);
+    let properties = _resolve_properties(tjsg_schema);
     if (properties) {
         properties = _update_properties(properties, interface_node);
     }
@@ -128,29 +131,29 @@ function _generate_interface_schema(program, name, interface_node) {
         extends: _resolve_extends(interface_node),
         full_text,
         properties,
-        type: _resolve_type(tjs_schema, name),
-        items: _resolve_items(tjs_schema),
+        type: _resolve_type(tjsg_schema, name),
+        items: _resolve_items(tjsg_schema, name),
     };
     return utils.no_undefined(interface_schema);
 }
-function _generate_type_schema(program, name, type_node) {
+function _generate_type_schema(tsconfig_path, file_path, name, type_node) {
     const full_text = type_node.getFullText();
-    const tjs_schema = _tjs_schema(program, name);
+    const tjsg_schema = _tjsg_schema(tsconfig_path, file_path, name);
     // console.log(`NAME: ${name}`);
-    // console.log(`TJS: `, tjs_schema);
-    if (!tjs_schema) {
-        return undefined;
-        // throw new Error(`Cannot generate schema for type '${name}'`);
+    // console.log(`TJS: `, tjsg_schema);
+    if (!tjsg_schema) {
+        throw new Error(`Cannot generate schema for type '${name}'`);
     }
-    let properties = _resolve_properties(tjs_schema);
+    // let properties = _resolve_properties(tjsg_schema, name);
+    let properties = _resolve_properties(tjsg_schema);
     if (properties) {
         properties = _update_properties(properties, type_node);
     }
     const type_schema = {
         full_text,
         properties,
-        type: _resolve_type(tjs_schema, name),
-        items: _resolve_items(tjs_schema),
+        type: _resolve_type(tjsg_schema, name),
+        items: _resolve_items(tjsg_schema, name),
     };
     return utils.no_undefined(type_schema);
 }
@@ -197,8 +200,18 @@ function _update_properties(properties, node) {
     }
     return properties;
 }
-function _resolve_type(tjs_schema, name) {
-    const type = tjs_schema === null || tjs_schema === void 0 ? void 0 : tjs_schema.type;
+function _get_definition(tjsg_schema, name) {
+    var _a;
+    console.log(tjsg_schema);
+    const definition = (_a = tjsg_schema.definitions) === null || _a === void 0 ? void 0 : _a[name];
+    if (!definition || typeof definition === 'boolean') {
+        throw new Error(`Cannot resolve definition for '${name}'`);
+    }
+    return definition;
+}
+function _resolve_type(tjsg_schema, name) {
+    const definition = _get_definition(tjsg_schema, name);
+    const type = definition.type;
     if (!type) {
         throw new Error(`Cannot resolve 'type' for '${name}'`);
     }
@@ -227,15 +240,17 @@ function _resolve_type(tjs_schema, name) {
     }
     return 'undefined';
 }
-function _resolve_items(tjs_schema) {
-    const items = tjs_schema === null || tjs_schema === void 0 ? void 0 : tjs_schema.items;
+function _resolve_items(tjsg_schema, name) {
+    const definition = _get_definition(tjsg_schema, name);
+    const items = definition === null || definition === void 0 ? void 0 : definition.items;
     if (!items || typeof items === 'boolean') {
         return undefined;
     }
     return items;
 }
-function _resolve_properties(tjs_schema) {
-    const tjs_properties = tjs_schema.properties;
+function _resolve_properties(tjsg_schema) {
+    // const definition = _get_definition(tjsg_schema, name);
+    const tjs_properties = tjsg_schema.properties;
     if (!tjs_properties) {
         return undefined;
     }
@@ -247,6 +262,7 @@ function _resolve_properties(tjs_schema) {
         const property = {
             enum: _resolve_enum(value.enum),
             type: _resolve_type(value, key),
+            // properties: _resolve_properties(value, key),
             properties: _resolve_properties(value),
         };
         properties[key] = utils.no_undefined(property);
@@ -263,28 +279,25 @@ function _resolve_enum(tjs_enum) {
     // TODO Check all possibilities
     return tjs_enum;
 }
-function _resolve_types(program, source_file) {
+function _resolve_types(tsconfig_path, source_file) {
     ion.trace(`Resolving types...`);
     const types = {};
     const type_nodes = _get_nested_of_type(source_file, ts.SyntaxKind.TypeAliasDeclaration);
     if (type_nodes.length === 0) {
         return undefined;
     }
+    const file_name = source_file.fileName;
     for (const type_node of type_nodes) {
         const name = type_node.name.getText();
-        const generated_schema = _generate_type_schema(program, name, type_node);
+        ion.trace(`Resolving type for '${name}'...`);
+        const generated_schema = _generate_type_schema(tsconfig_path, file_name, name, type_node);
         if (generated_schema) {
             types[name] = generated_schema;
         }
     }
     return types;
 }
-function _create_ts_program(options) {
-    let tsconfig_path = _get_default_tsconfig_path();
-    if (typeof (options === null || options === void 0 ? void 0 : options.tsconfig_path) === 'string' &&
-        (options === null || options === void 0 ? void 0 : options.tsconfig_path) !== '') {
-        tsconfig_path = options.tsconfig_path;
-    }
+function _create_ts_program(tsconfig_path) {
     const config_file = ts.readConfigFile(tsconfig_path, ts.sys.readFile);
     const config_object = config_file.config;
     const parse_result = ts.parseJsonConfigFileContent(config_object, ts.sys, path.dirname(tsconfig_path));
@@ -329,23 +342,24 @@ function _get_nested_of_type(node, kind) {
     }
     return nodes;
 }
-function _tjs_schema(program, name) {
-    const partial_args = {
-        ref: false,
+function _tjsg_schema(tsconfig, file_path, name) {
+    const config = {
+        path: file_path,
+        tsconfig,
+        type: name,
+        expose: 'none',
+        sortProps: true,
+        skipTypeCheck: true,
     };
-    try {
-        const tjs_schema = tjs.generateSchema(program, name, partial_args);
-        if (!tjs_schema) {
-            return undefined;
-        }
-        tjs_schema === null || tjs_schema === void 0 ? true : delete tjs_schema.$schema;
-        return tjs_schema;
+    const generator = tjsg.createGenerator(config);
+    const schema = generator.createSchema(config.type);
+    return schema;
+}
+function _resolve_tsconfig_path(path) {
+    let tsconfig_path = _get_default_tsconfig_path();
+    if (typeof path === 'string' && path !== '') {
+        tsconfig_path = path;
     }
-    catch (e) {
-        const err = e;
-        const error_message = 'message' in err ? err.message : '';
-        ion.warn(`TJS failed`, error_message);
-        return undefined;
-    }
+    return tsconfig_path;
 }
 //# sourceMappingURL=index.js.map
