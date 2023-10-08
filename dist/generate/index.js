@@ -122,8 +122,8 @@ function _generate_interface_schema(tsconfig_path, file_path, name, interface_no
     if (!tjsg_schema) {
         throw new Error(`Cannot generate schema for interface '${name}'`);
     }
-    // let properties = _resolve_properties(tjsg_schema, name);
-    let properties = _resolve_properties(tjsg_schema);
+    const definition = _get_definition(tjsg_schema, name);
+    let properties = _resolve_properties(definition);
     if (properties) {
         properties = _update_properties(properties, interface_node);
     }
@@ -131,8 +131,8 @@ function _generate_interface_schema(tsconfig_path, file_path, name, interface_no
         extends: _resolve_extends(interface_node),
         full_text,
         properties,
-        type: _resolve_type(tjsg_schema, name),
-        items: _resolve_items(tjsg_schema, name),
+        type: _resolve_type(definition, name),
+        items: _resolve_items(definition),
     };
     return utils.no_undefined(interface_schema);
 }
@@ -144,7 +144,7 @@ function _generate_type_schema(tsconfig_path, file_path, name, type_node) {
     if (!tjsg_schema) {
         throw new Error(`Cannot generate schema for type '${name}'`);
     }
-    // let properties = _resolve_properties(tjsg_schema, name);
+    const definition = _get_definition(tjsg_schema, name);
     let properties = _resolve_properties(tjsg_schema);
     if (properties) {
         properties = _update_properties(properties, type_node);
@@ -152,8 +152,8 @@ function _generate_type_schema(tsconfig_path, file_path, name, type_node) {
     const type_schema = {
         full_text,
         properties,
-        type: _resolve_type(tjsg_schema, name),
-        items: _resolve_items(tjsg_schema, name),
+        type: _resolve_type(definition, name),
+        items: _resolve_items(definition),
     };
     return utils.no_undefined(type_schema);
 }
@@ -202,15 +202,13 @@ function _update_properties(properties, node) {
 }
 function _get_definition(tjsg_schema, name) {
     var _a;
-    console.log(tjsg_schema);
     const definition = (_a = tjsg_schema.definitions) === null || _a === void 0 ? void 0 : _a[name];
     if (!definition || typeof definition === 'boolean') {
         throw new Error(`Cannot resolve definition for '${name}'`);
     }
     return definition;
 }
-function _resolve_type(tjsg_schema, name) {
-    const definition = _get_definition(tjsg_schema, name);
+function _resolve_type(definition, name) {
     const type = definition.type;
     if (!type) {
         throw new Error(`Cannot resolve 'type' for '${name}'`);
@@ -240,17 +238,15 @@ function _resolve_type(tjsg_schema, name) {
     }
     return 'undefined';
 }
-function _resolve_items(tjsg_schema, name) {
-    const definition = _get_definition(tjsg_schema, name);
+function _resolve_items(definition) {
     const items = definition === null || definition === void 0 ? void 0 : definition.items;
     if (!items || typeof items === 'boolean') {
         return undefined;
     }
     return items;
 }
-function _resolve_properties(tjsg_schema) {
-    // const definition = _get_definition(tjsg_schema, name);
-    const tjs_properties = tjsg_schema.properties;
+function _resolve_properties(definition) {
+    const tjs_properties = definition.properties;
     if (!tjs_properties) {
         return undefined;
     }
@@ -262,7 +258,6 @@ function _resolve_properties(tjsg_schema) {
         const property = {
             enum: _resolve_enum(value.enum),
             type: _resolve_type(value, key),
-            // properties: _resolve_properties(value, key),
             properties: _resolve_properties(value),
         };
         properties[key] = utils.no_undefined(property);
