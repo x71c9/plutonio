@@ -21,12 +21,25 @@ export function generate(
   options?: Partial<GenerateOptions>
 ): types.ProjectSchema {
   const tsconfig_path = _resolve_tsconfig_path(options?.tsconfig_path);
-  const program = _create_ts_program(tsconfig_path);
-  const project_schema = _generate_project_schema(program, tsconfig_path);
-  return project_schema;
+  // const program = _create_ts_program(tsconfig_path);
+  // const project_schema = _generate_project_schema(program, tsconfig_path);
+
+  const config = {
+    path: '/Users/x71c9/repos/plutonio/builder/src/index.ts',
+    tsconfig: tsconfig_path,
+    type: '*', // Or <type-name> if you want to generate schema for that one type only
+    // expose: 'none',
+    // sortProps: true,
+    skipTypeCheck: true,
+  };
+  const schema = tjsg.createGenerator(config).createSchema(config.type);
+  return schema as any;
+
+  // return project_schema;
 }
 
-function _generate_project_schema(
+// TODO
+export function _generate_project_schema(
   program: ts.Program,
   tsconfig_path: string
 ): types.ProjectSchema {
@@ -412,7 +425,8 @@ function _resolve_types(
   return types;
 }
 
-function _create_ts_program(tsconfig_path: string) {
+// TODO
+export function _create_ts_program(tsconfig_path: string) {
   const config_file = ts.readConfigFile(tsconfig_path, ts.sys.readFile);
   const config_object = config_file.config;
   const parse_result = ts.parseJsonConfigFileContent(
