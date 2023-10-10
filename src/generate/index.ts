@@ -20,74 +20,226 @@ type GenerateOptions = {
 export function generate(
   options?: Partial<GenerateOptions>
 ): types.ProjectSchema {
-  const tsconfig_path = _resolve_tsconfig_path(options?.tsconfig_path);
-  // const program = _create_ts_program(tsconfig_path);
-  // const project_schema = _generate_project_schema(program, tsconfig_path);
-
-  const config = {
-    path: '/Users/x71c9/repos/plutonio/builder/src/index.ts',
-    tsconfig: tsconfig_path,
-    type: '*', // Or <type-name> if you want to generate schema for that one type only
-    // expose: 'none',
-    // sortProps: true,
-    skipTypeCheck: true,
-  };
-  const schema = tjsg.createGenerator(config).createSchema(config.type);
-  return schema as any;
-
-  // return project_schema;
+  const generator = new Generator(options);
+  return generator.generate();
 }
 
-// TODO
-export function _generate_project_schema(
-  program: ts.Program,
-  tsconfig_path: string
-): types.ProjectSchema {
-  const project_schema: types.ProjectSchema = {};
-  const source_files = program.getSourceFiles();
-  for (const source_file of source_files) {
-    if (source_file.isDeclarationFile) {
-      continue;
+class Generator {
+  private tjsg_schema_by_file = new Map<string, tjsg.Schema>();
+  private tsconfig_path: string;
+  private program: ts.Program;
+  constructor(options?: Partial<GenerateOptions>) {
+    this.tsconfig_path = _resolve_tsconfig_path(options?.tsconfig_path);
+    this.program = this._create_ts_program();
+    this._generate_tjsg_schema_map();
+  }
+  public generate(): types.ProjectSchema {
+    const project_schema = this._generate_project_schema();
+    return project_schema;
+  }
+  private _generate_tjsg_schema_map() {
+    const source_files = this.program.getSourceFiles();
+    for (const source_file of source_files) {
+      if (source_file.isDeclarationFile) {
+        continue;
+      }
+      const file_name = source_file.fileName;
+      ion.trace(`Generating tjsg schema for ${file_name}`);
+      const config = {
+        // expose: 'none',
+        path: file_name,
+        skipTypeCheck: true,
+        sortProps: true,
+        tsconfig: this.tsconfig_path,
+        type: '*',
+      } as const;
+      const schema = tjsg.createGenerator(config).createSchema(config.type);
+      this._resolve_refs(schema);
+      this.tjsg_schema_by_file.set(file_name, schema);
+    }
+  }
+  private _create_ts_program() {
+    const config_file = ts.readConfigFile(this.tsconfig_path, ts.sys.readFile);
+    const config_object = config_file.config;
+    const parse_result = ts.parseJsonConfigFileContent(
+      config_object,
+      ts.sys,
+      path.dirname(this.tsconfig_path)
+    );
+    const compilerOptions = parse_result.options;
+    const rootNames = parse_result.fileNames;
+    const create_program_options = {
+      rootNames: rootNames,
+      options: compilerOptions,
+    };
+    const program = ts.createProgram(create_program_options);
+    // .getTypeChcker needs to be called otherwise
+    // when searching nested nodes, the nodes have no
+    // SourceFile attached to and the system fails
+    program.getTypeChecker();
+    return program;
+  }
+  private _resolve_refs(_schema: tjsg.Schema) {
+    // TODO: Implement
+  }
+  private _generate_project_schema(): types.ProjectSchema {
+    const project_schema: types.ProjectSchema = {};
+    const source_files = this.program.getSourceFiles();
+    for (const source_file of source_files) {
+      if (source_file.isDeclarationFile) {
+        continue;
+      }
+      const file_name = source_file.fileName;
+      ion.trace(`Parsing ${file_name}`);
+      project_schema[source_file.fileName] =
+        this._resolve_file_schema(source_file);
+    }
+    return project_schema;
+  }
+  private _resolve_file_schema(source_file: ts.SourceFile): types.FileSchema {
+    const file_schema: types.FileSchema = {
+      imports: this._resolve_imports(source_file),
+      interfaces: this._resolve_interfaces(source_file),
+      types: this._resolve_types(source_file),
+    };
+    return utils.no_undefined(file_schema);
+  }
+  private _resolve_interfaces(
+    source_file: ts.SourceFile
+  ): types.Interfaces | undefined {
+    ion.trace(`Resolving interfaces...`);
+    const interfaces: types.Interfaces = {};
+    const interface_nodes = _get_nested_of_type<ts.InterfaceDeclaration>(
+      source_file,
+      ts.SyntaxKind.InterfaceDeclaration
+    );
+    if (interface_nodes.length === 0) {
+      return undefined;
+    }
+    const file_path = source_file.fileName;
+    for (const interface_node of interface_nodes) {
+      const name = interface_node.name.getText();
+      ion.trace(`Resolving interface for '${name}'...`);
+      const generated_schema = this._generate_interface_schema(
+        file_path,
+        name,
+        interface_node
+      );
+      if (generated_schema) {
+        interfaces[name] = generated_schema;
+      }
+    }
+    return interfaces;
+  }
+  private _generate_interface_schema(
+    file_path: string,
+    name: string,
+    interface_node: ts.InterfaceDeclaration
+  ): types.Interface | undefined {
+    const full_text = interface_node.getFullText();
+    // const tjsg_schema = this._tjsg_schema(file_path, name);
+    const tjsg_schema = this._tjsg_schema(file_path);
+    if (!tjsg_schema) {
+      throw new Error(`Cannot generate schema for interface '${name}'`);
+    }
+    const definition = _get_definition(tjsg_schema, name);
+    let properties = _resolve_properties(name, definition);
+    if (properties) {
+      properties = _update_properties(properties, interface_node);
+    }
+    const interface_schema = {
+      extends: _resolve_extends(interface_node),
+      full_text,
+      properties,
+      type: _resolve_type(definition, name),
+      items: _resolve_items(definition),
+    };
+    return utils.no_undefined(interface_schema);
+  }
+  private _tjsg_schema(file_path: string): tjsg.Schema | undefined {
+    // const config = {
+    //   path: file_path,
+    //   tsconfig: this.tsconfig_path,
+    //   type: name,
+    //   expose: 'none',
+    //   sortProps: true,
+    //   skipTypeCheck: true,
+    // } as const;
+    // const generator = tjsg.createGenerator(config);
+    // const schema = generator.createSchema(config.type);
+    // return schema;
+    const file_schema = this.tjsg_schema_by_file.get(file_path);
+    return file_schema;
+  }
+  private _resolve_imports(
+    source_file: ts.SourceFile
+  ): types.Import[] | undefined {
+    ion.trace(`Resolving imports...`);
+    const imports: types.Import[] = [];
+    const import_declarations: ts.ImportDeclaration[] = _get_nested_of_type(
+      source_file,
+      ts.SyntaxKind.ImportDeclaration
+    );
+    for (const import_declaration of import_declarations) {
+      const import_parts = _generate_import_schema(import_declaration);
+      imports.push(import_parts);
+    }
+    if (imports.length === 0) {
+      return undefined;
+    }
+    return imports;
+  }
+  private _resolve_types(source_file: ts.SourceFile): types.Types | undefined {
+    ion.trace(`Resolving types...`);
+    const types: types.Types = {};
+    const type_nodes = _get_nested_of_type<ts.TypeAliasDeclaration>(
+      source_file,
+      ts.SyntaxKind.TypeAliasDeclaration
+    );
+    if (type_nodes.length === 0) {
+      return undefined;
     }
     const file_name = source_file.fileName;
-    ion.trace(`Parsing: ${file_name}`);
-    project_schema[source_file.fileName] = _resolve_file_schema(
-      tsconfig_path,
-      source_file
-    );
+    for (const type_node of type_nodes) {
+      const name = type_node.name.getText();
+      ion.trace(`Resolving type for '${name}'...`);
+      const generated_schema = this._generate_type_schema(
+        file_name,
+        name,
+        type_node
+      );
+      if (generated_schema) {
+        types[name] = generated_schema;
+      }
+    }
+    return types;
   }
-  return project_schema;
-}
-
-function _resolve_file_schema(
-  tsconfig_path: string,
-  source_file: ts.SourceFile
-): types.FileSchema {
-  const file_schema: types.FileSchema = {
-    imports: _resolve_imports(source_file),
-    interfaces: _resolve_interfaces(tsconfig_path, source_file),
-    types: _resolve_types(tsconfig_path, source_file),
-  };
-  return utils.no_undefined(file_schema);
-}
-
-function _resolve_imports(
-  source_file: ts.SourceFile
-): types.Import[] | undefined {
-  ion.trace(`Resolving imports...`);
-  const imports: types.Import[] = [];
-  const import_declarations: ts.ImportDeclaration[] = _get_nested_of_type(
-    source_file,
-    ts.SyntaxKind.ImportDeclaration
-  );
-  for (const import_declaration of import_declarations) {
-    const import_parts = _generate_import_schema(import_declaration);
-    imports.push(import_parts);
+  private _generate_type_schema(
+    file_path: string,
+    name: string,
+    type_node: ts.TypeAliasDeclaration
+  ): types.Type | undefined {
+    const full_text = type_node.getFullText();
+    // const tjsg_schema = this._tjsg_schema(file_path, name);
+    const tjsg_schema = this._tjsg_schema(file_path);
+    // console.log(`NAME: ${name}`);
+    // console.log(`TJS: `, tjsg_schema);
+    if (!tjsg_schema) {
+      throw new Error(`Cannot generate schema for type '${name}'`);
+    }
+    const definition = _get_definition(tjsg_schema, name);
+    let properties = _resolve_properties(name, definition);
+    if (properties) {
+      properties = _update_properties(properties, type_node);
+    }
+    const type_schema = {
+      full_text,
+      properties,
+      type: _resolve_type(definition, name),
+      items: _resolve_items(definition),
+    };
+    return utils.no_undefined(type_schema);
   }
-  if (imports.length === 0) {
-    return undefined;
-  }
-  return imports;
 }
 
 function _generate_import_schema(
@@ -151,89 +303,6 @@ function _generate_import_schema(
     clause,
     specifiers: [],
   };
-}
-
-function _resolve_interfaces(
-  tsconfig_path: string,
-  source_file: ts.SourceFile
-): types.Interfaces | undefined {
-  ion.trace(`Resolving interfaces...`);
-  const interfaces: types.Interfaces = {};
-  const interface_nodes = _get_nested_of_type<ts.InterfaceDeclaration>(
-    source_file,
-    ts.SyntaxKind.InterfaceDeclaration
-  );
-  if (interface_nodes.length === 0) {
-    return undefined;
-  }
-  const file_path = source_file.fileName;
-  for (const interface_node of interface_nodes) {
-    const name = interface_node.name.getText();
-    ion.trace(`Resolving interface for '${name}'...`);
-    const generated_schema = _generate_interface_schema(
-      tsconfig_path,
-      file_path,
-      name,
-      interface_node
-    );
-    if (generated_schema) {
-      interfaces[name] = generated_schema;
-    }
-  }
-  return interfaces;
-}
-
-function _generate_interface_schema(
-  tsconfig_path: string,
-  file_path: string,
-  name: string,
-  interface_node: ts.InterfaceDeclaration
-): types.Interface | undefined {
-  const full_text = interface_node.getFullText();
-  const tjsg_schema = _tjsg_schema(tsconfig_path, file_path, name);
-  if (!tjsg_schema) {
-    throw new Error(`Cannot generate schema for interface '${name}'`);
-  }
-  const definition = _get_definition(tjsg_schema, name);
-  let properties = _resolve_properties(name, definition);
-  if (properties) {
-    properties = _update_properties(properties, interface_node);
-  }
-  const interface_schema = {
-    extends: _resolve_extends(interface_node),
-    full_text,
-    properties,
-    type: _resolve_type(definition, name),
-    items: _resolve_items(definition),
-  };
-  return utils.no_undefined(interface_schema);
-}
-
-function _generate_type_schema(
-  tsconfig_path: string,
-  file_path: string,
-  name: string,
-  type_node: ts.TypeAliasDeclaration
-): types.Type | undefined {
-  const full_text = type_node.getFullText();
-  const tjsg_schema = _tjsg_schema(tsconfig_path, file_path, name);
-  // console.log(`NAME: ${name}`);
-  // console.log(`TJS: `, tjsg_schema);
-  if (!tjsg_schema) {
-    throw new Error(`Cannot generate schema for type '${name}'`);
-  }
-  const definition = _get_definition(tjsg_schema, name);
-  let properties = _resolve_properties(name, definition);
-  if (properties) {
-    properties = _update_properties(properties, type_node);
-  }
-  const type_schema = {
-    full_text,
-    properties,
-    type: _resolve_type(definition, name),
-    items: _resolve_items(definition),
-  };
-  return utils.no_undefined(type_schema);
 }
 
 function _resolve_extends(interface_node: ts.InterfaceDeclaration): string[] {
@@ -395,59 +464,6 @@ function _resolve_enum(tjs_enum?: unknown[]): types.Primitive[] | undefined {
   return tjs_enum as types.Primitive[];
 }
 
-function _resolve_types(
-  tsconfig_path: string,
-  source_file: ts.SourceFile
-): types.Types | undefined {
-  ion.trace(`Resolving types...`);
-  const types: types.Types = {};
-  const type_nodes = _get_nested_of_type<ts.TypeAliasDeclaration>(
-    source_file,
-    ts.SyntaxKind.TypeAliasDeclaration
-  );
-  if (type_nodes.length === 0) {
-    return undefined;
-  }
-  const file_name = source_file.fileName;
-  for (const type_node of type_nodes) {
-    const name = type_node.name.getText();
-    ion.trace(`Resolving type for '${name}'...`);
-    const generated_schema = _generate_type_schema(
-      tsconfig_path,
-      file_name,
-      name,
-      type_node
-    );
-    if (generated_schema) {
-      types[name] = generated_schema;
-    }
-  }
-  return types;
-}
-
-// TODO
-export function _create_ts_program(tsconfig_path: string) {
-  const config_file = ts.readConfigFile(tsconfig_path, ts.sys.readFile);
-  const config_object = config_file.config;
-  const parse_result = ts.parseJsonConfigFileContent(
-    config_object,
-    ts.sys,
-    path.dirname(tsconfig_path)
-  );
-  const compilerOptions = parse_result.options;
-  const rootNames = parse_result.fileNames;
-  const create_program_options = {
-    rootNames: rootNames,
-    options: compilerOptions,
-  };
-  const program = ts.createProgram(create_program_options);
-  // .getTypeChcker needs to be called otherwise
-  // when searching nested nodes, the nodes have no
-  // SourceFile attached to and the system fails
-  program.getTypeChecker();
-  return program;
-}
-
 function _get_default_tsconfig_path() {
   return './tsconfig.json';
 }
@@ -479,24 +495,6 @@ function _get_nested_of_type<T extends ts.Node>(
     nodes = nodes.concat(nested_nodes as T[]);
   }
   return nodes;
-}
-
-function _tjsg_schema(
-  tsconfig: string,
-  file_path: string,
-  name: string
-): tjsg.Schema {
-  const config = {
-    path: file_path,
-    tsconfig,
-    type: name,
-    expose: 'none',
-    sortProps: true,
-    skipTypeCheck: true,
-  } as const;
-  const generator = tjsg.createGenerator(config);
-  const schema = generator.createSchema(config.type);
-  return schema;
 }
 
 function _resolve_tsconfig_path(path?: string): string {
