@@ -111,7 +111,7 @@ function _resolve_interfaces(tsconfig_path, source_file) {
         ion.trace(`Resolving interface for '${name}'...`);
         const generated_schema = _generate_interface_schema(tsconfig_path, file_path, name, interface_node);
         if (generated_schema) {
-            interfaces[name];
+            interfaces[name] = generated_schema;
         }
     }
     return interfaces;
@@ -145,7 +145,7 @@ function _generate_type_schema(tsconfig_path, file_path, name, type_node) {
         throw new Error(`Cannot generate schema for type '${name}'`);
     }
     const definition = _get_definition(tjsg_schema, name);
-    let properties = _resolve_properties(tjsg_schema);
+    let properties = _resolve_properties(definition);
     if (properties) {
         properties = _update_properties(properties, type_node);
     }
@@ -210,6 +210,7 @@ function _get_definition(tjsg_schema, name) {
 }
 function _resolve_type(definition, name) {
     const type = definition.type;
+    console.log(definition);
     if (!type) {
         throw new Error(`Cannot resolve 'type' for '${name}'`);
     }
