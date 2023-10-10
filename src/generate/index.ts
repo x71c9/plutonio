@@ -182,7 +182,7 @@ function _generate_interface_schema(
     throw new Error(`Cannot generate schema for interface '${name}'`);
   }
   const definition = _get_definition(tjsg_schema, name);
-  let properties = _resolve_properties(definition);
+  let properties = _resolve_properties(name, definition);
   if (properties) {
     properties = _update_properties(properties, interface_node);
   }
@@ -210,7 +210,7 @@ function _generate_type_schema(
     throw new Error(`Cannot generate schema for type '${name}'`);
   }
   const definition = _get_definition(tjsg_schema, name);
-  let properties = _resolve_properties(definition);
+  let properties = _resolve_properties(name, definition);
   if (properties) {
     properties = _update_properties(properties, type_node);
   }
@@ -300,11 +300,15 @@ function _get_definition(
   return definition;
 }
 
-function _resolve_type(definition: tjsg.Schema, name: string): types.Primitive {
+function _resolve_type(
+  definition: tjsg.Schema,
+  name: string
+): types.Primitive | undefined {
   const type = definition.type;
-  console.log(definition);
+  // console.log(definition);
   if (!type) {
-    throw new Error(`Cannot resolve 'type' for '${name}'`);
+    ion.warn(`Cannot resolve 'type' for '${name}'`);
+    return undefined;
   }
   switch (type) {
     case 'string': {
@@ -341,9 +345,10 @@ function _resolve_items(definition: tjsg.Schema): types.Items | undefined {
 }
 
 function _resolve_properties(
-  definition: tjsg.Schema
+  name: string,
+  definition?: tjsg.Schema
 ): types.Properties | undefined {
-  const tjs_properties = definition.properties;
+  const tjs_properties = definition?.properties;
   if (!tjs_properties) {
     return undefined;
   }
@@ -352,10 +357,14 @@ function _resolve_properties(
     if (typeof value === 'boolean') {
       continue;
     }
+    const type = _resolve_type(value, `${name}.${key}`);
+    if (!type) {
+      return undefined;
+    }
     const property: types.Property = {
       enum: _resolve_enum(value.enum),
-      type: _resolve_type(value, key),
-      properties: _resolve_properties(value),
+      properties: _resolve_properties(`${name}.${key}`, value),
+      type,
     };
     properties[key] = utils.no_undefined(property);
   }
