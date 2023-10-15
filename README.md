@@ -1,6 +1,6 @@
 # Plutonio
 
-Plutonio is a Typescript library that scan your typescript project and generate
+Plutonio is a Typescript library that scans your typescript project and generate
 a schema of all types and interfaces of the project.
 
 The schema is the following:
