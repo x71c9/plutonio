@@ -18,6 +18,9 @@
     "dev:base": "node ./dist/index.js",
     "dev:run": "yarn tsc-watch --onSuccess \"yarn dev:base\"",
     "dev": "yarn tsc -w",
+    "push:patch": "bash ./scripts/version.sh patch",
+    "push:minor": "bash ./scripts/version.sh minor",
+    "push:major": "bash ./scripts/version.sh major",
     "build": "yarn tsc -b"
   },
   "lint-staged": {
@@ -30,7 +33,7 @@
     "@typescript-eslint/eslint-plugin": "^5.59.1",
     "@typescript-eslint/parser": "^5.59.1",
     "eslint": "^8.39.0",
-    "eslint-onfig-prettier": "^8.8.0",
+    "eslint-config-prettier": "^8.8.0",
     "eslint-plugin-import": "^2.27.5",
     "eslint-plugin-json": "^3.1.0",
     "eslint-plugin-node": "^11.1.0",
