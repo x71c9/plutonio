@@ -18,9 +18,9 @@
     "dev:base": "node ./dist/index.js",
     "dev:run": "yarn tsc-watch --onSuccess \"yarn dev:base\"",
     "dev": "yarn tsc -w",
-    "push:patch": "bash ./scripts/version.sh patch",
-    "push:minor": "bash ./scripts/version.sh minor",
-    "push:major": "bash ./scripts/version.sh major",
+    "push:patch": "sh ./scripts/version.sh patch",
+    "push:minor": "sh ./scripts/version.sh minor",
+    "push:major": "sh ./scripts/version.sh major",
     "build": "yarn tsc -b"
   },
   "lint-staged": {
