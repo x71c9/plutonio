@@ -54,8 +54,12 @@ class Generator {
         type: '*',
       } as const;
       const schema = tjsg.createGenerator(config).createSchema(config.type);
-      this._resolve_refs(schema);
+      // TODO
+      ion.debug(file_name, schema);
       this.tjsg_schema_by_file.set(file_name, schema);
+    }
+    for (const [file_name, schema] of this.tjsg_schema_by_file) {
+      this._resolve_refs(schema, file_name);
     }
   }
   private _create_ts_program() {
@@ -79,8 +83,52 @@ class Generator {
     program.getTypeChecker();
     return program;
   }
-  private _resolve_refs(_schema: tjsg.Schema) {
-    // TODO: Implement
+  private _resolve_refs(schema: tjsg.Schema, file_name: string) {
+    if (!schema.definitions) {
+      return;
+    }
+    for (const [_name, definition] of Object.entries(schema.definitions)) {
+      if (typeof definition === 'boolean') {
+        continue;
+      }
+      this._resolve_definition_refs(definition, file_name);
+    }
+  }
+  private _resolve_definition_refs(definition: tjsg.Schema, file_name: string) {
+    const properties = definition.properties;
+    if (!properties) {
+      return;
+    }
+    for (let [prop_name, prop_def] of Object.entries(properties)) {
+      if (typeof prop_def === 'boolean') {
+        continue;
+      }
+      const ref = prop_def.$ref;
+      if (typeof ref === 'string' && ref !== '') {
+        if (ref[0] !== '#') {
+          ion.warn(
+            `Reference $ref for ${prop_name} doesn't start with #/definition/`
+          );
+          ion.warn(`Reference $ref for ${prop_name} is ${ref}`);
+          continue;
+        }
+        const ref_name = ref.replace(`#/definitions/`, '');
+        const file_schema = this.tjsg_schema_by_file.get(file_name);
+        if (!file_schema) {
+          ion.warn(`Cannot find schema for file ${file_name}`);
+          ion.warn(`Cannot resolve reference for ${prop_name}`);
+          continue;
+        }
+        const ref_value = file_schema.definitions?.[ref_name];
+        if (!ref_value) {
+          ion.warn(`Cannot find schema for definition ${ref_name}`);
+          ion.warn(`Cannot resolve reference for ${prop_name}`);
+          continue;
+        }
+        ion.trace(`Replacing ${prop_name} value with`, ref_value);
+        properties[prop_name] = ref_value;
+      }
+    }
   }
   private _generate_project_schema(): types.ProjectSchema {
     const project_schema: types.ProjectSchema = {};
