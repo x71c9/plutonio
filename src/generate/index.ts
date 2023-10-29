@@ -13,18 +13,311 @@ import * as tjsg from 'ts-json-schema-generator';
 import * as types from '../types/index.js';
 import * as utils from '../utils/index.js';
 
+type GenerateParams = {
+  tsconfig_path: string;
+  source_file_path: string;
+  type_name: string;
+};
+
+export function generate(params: GenerateParams): TypeSchema {
+  const generator = new Generator();
+  return generator.generate(params);
+}
+
+class Generator {
+  public projects = new Map<string, Project>();
+  public get_project(tsconfig_path: string) {
+    if (this.projects.has(tsconfig_path)) {
+      return this.projects.get(tsconfig_path) as Project;
+    }
+    const project = new Project(tsconfig_path);
+    this.projects.set(tsconfig_path, project);
+    return project;
+  }
+  public generate(params: GenerateParams) {
+    const project = this.get_project(params.tsconfig_path);
+    const source_file = project.get_source_file(params.source_file_path);
+    const type = source_file.get_type(params.type_name);
+    const schema = type.generate_schema();
+    return schema;
+  }
+}
+
+class Project {
+  public source_files = new Map<string, SourceFile>();
+  public program: ts.Program;
+  constructor(public tsconfig_path: string) {
+    const config_file = ts.readConfigFile(this.tsconfig_path, ts.sys.readFile);
+    const config_object = config_file.config;
+    const parse_result = ts.parseJsonConfigFileContent(
+      config_object,
+      ts.sys,
+      path.dirname(this.tsconfig_path)
+    );
+    const compilerOptions = parse_result.options;
+    const rootNames = parse_result.fileNames;
+    const create_program_options = {
+      rootNames: rootNames,
+      options: compilerOptions,
+    };
+    this.program = ts.createProgram(create_program_options);
+    // .getTypeChcker needs to be called otherwise
+    // when searching nested nodes, the nodes have no
+    // SourceFile attached to and the system fails
+    this.program.getTypeChecker();
+  }
+  public get_source_file(source_file_path: string): SourceFile {
+    if (this.source_files.has(source_file_path)) {
+      return this.source_files.get(source_file_path) as SourceFile;
+    }
+    const source_file = new SourceFile(source_file_path, this);
+    this.source_files.set(source_file_path, source_file);
+    return source_file;
+  }
+}
+
+type NodeType = {
+  type: 'type' | 'interface';
+  node: ts.Node;
+};
+
+class SourceFile {
+  public types = new Map<string, Type>();
+  public nodes = new Map<string, NodeType>();
+  public imports: Import[] = [];
+  public source: ts.SourceFile;
+  public tjsg_generator: tjsg.SchemaGenerator;
+  constructor(public path: string, public project: Project) {
+    const config = {
+      tsconfig: this.project.tsconfig_path,
+      path,
+      skipTypeCheck: true,
+      sortProps: true,
+      expose: 'none',
+    } as const;
+    this.tjsg_generator = tjsg.createGenerator(config);
+    this.source = this._resolve_source();
+    this._resolve_imports();
+    this._resolve_nodes();
+  }
+  public get_type(type_name: string): Type {
+    if (this.types.has(type_name)) {
+      return this.types.get(type_name) as Type;
+    }
+    const type = new Type(type_name, this);
+    this.types.set(type_name, type);
+    return type;
+  }
+  private _resolve_source() {
+    const source_file = this.project.program.getSourceFile(this.path);
+    if (!source_file) {
+      throw new Error(`Cannot find source file ${this.path}`);
+    }
+    return source_file;
+  }
+  private _resolve_nodes() {
+    // Interface
+    const interface_nodes = _get_nested_of_type<ts.InterfaceDeclaration>(
+      this.source,
+      ts.SyntaxKind.InterfaceDeclaration
+    );
+    for (const interface_node of interface_nodes) {
+      const name = interface_node.name.getText();
+      this.nodes.set(name, {
+        type: 'interface',
+        node: interface_node,
+      });
+    }
+    // Type
+    const type_nodes = _get_nested_of_type<ts.InterfaceDeclaration>(
+      this.source,
+      ts.SyntaxKind.TypeAliasDeclaration
+    );
+    for (const type_node of type_nodes) {
+      const name = type_node.name.getText();
+      this.nodes.set(name, {
+        type: 'type',
+        node: type_node,
+      });
+    }
+  }
+  private _resolve_imports() {
+    this.imports = [];
+    const import_declarations: ts.ImportDeclaration[] = _get_nested_of_type(
+      this.source,
+      ts.SyntaxKind.ImportDeclaration
+    );
+    for (const import_declaration of import_declarations) {
+      const import_parts = _generate_import_schema(import_declaration);
+      this.imports.push(import_parts);
+    }
+  }
+}
+
+type TypeSchema = Property & {
+  name: string;
+  imports: Import[];
+  // full_text: string;
+  // properties: Properties;
+  // type: Primitive;
+  // items?: Items;
+};
+
+type Import = {
+  clause: string;
+  module: string;
+  specifiers: string[];
+  text: string;
+};
+
+type Properties = {
+  [k: string]: Property;
+};
+
+type Property = {
+  type: Primitive;
+  original?: string;
+  enum?: Primitive[];
+  properties?: Properties;
+};
+
+// type Items = {
+//   type: Primitive | Primitive[];
+// };
+
+type Primitive =
+  | 'any'
+  | 'array'
+  | 'boolean'
+  | 'null'
+  | 'number'
+  | 'object'
+  | 'string'
+  | 'undefined';
+
+class Type {
+  private node: NodeType;
+  private tjsg_type_definition: tjsg.Schema;
+  constructor(public name: string, public source_file: SourceFile) {
+    this.tjsg_type_definition = this._resolve_tjsg_definition();
+    this.node = this._resolve_node();
+  }
+  public generate_schema(): TypeSchema {
+    const type_schema: TypeSchema = {
+      name: this.name,
+      type: _resolve_type(this.tjsg_type_definition, this.name),
+      original: this.node.node.getText(),
+      enum: this._resolve_enum(),
+      imports: this._resolve_imports(),
+      properties: _resolve_all_properties(
+        this.tjsg_type_definition,
+        this.node.node,
+        this.name
+      ),
+    };
+    return utils.no_undefined(type_schema);
+  }
+  private _resolve_tjsg_definition(): tjsg.Schema {
+    const tjsg_type_schema = this.source_file.tjsg_generator.createSchema(
+      this.name
+    );
+    const definitions = tjsg_type_schema.definitions;
+    if (!definitions || typeof definitions !== 'object') {
+      throw new Error(`Missing tjsg definition`);
+    }
+    const definition_keys = Object.keys(definitions);
+    if (definition_keys.length < 1) {
+      throw new Error(`Missing tjsg definition keys`);
+    }
+    const first_key = definition_keys[0] as keyof typeof definitions;
+    return definitions[first_key] as tjsg.Schema;
+  }
+  private _resolve_node(): NodeType {
+    if (this.source_file.nodes.has(this.name)) {
+      return this.source_file.nodes.get(this.name) as NodeType;
+    }
+    throw new Error(`Cannot resolve node`);
+  }
+  private _resolve_imports(): Import[] {
+    return this.source_file.imports;
+  }
+  // private _resolve_original(): string | undefined {
+  //   return undefined;
+  // }
+  private _resolve_enum(): Primitive[] | undefined {
+    return undefined;
+  }
+}
+
 type GenerateOptions = {
   tsconfig_path: string;
 };
 
-export function generate(
-  options?: Partial<GenerateOptions>
-): types.ProjectSchema {
-  const generator = new Generator(options);
-  return generator.generate();
+export function _resolve_original(node?: ts.Node): string | undefined {
+  if (!node) {
+    return undefined;
+  }
+  // const property_signatures = _get_nested_of_type(
+  //   node,
+  //   ts.SyntaxKind.PropertySignature
+  // ) as ts.PropertySignature[];
+  // const prop_signature_map = new Map<string, ts.PropertySignature>();
+  // for (const prop_sign of property_signatures) {
+  //   const identifiers = _get_nested_of_type(
+  //     prop_sign,
+  //     ts.SyntaxKind.Identifier
+  //   ) as ts.Identifier[];
+  //   const identifier = identifiers[0];
+  //   if (!identifier) {
+  //     throw new Error('Missing identifier for property signature');
+  //   }
+  //   const prop_name = identifier.getText();
+  //   prop_signature_map.set(prop_name, prop_sign);
+  // }
+  // const prop_signature = prop_signature_map.get(name);
+  // console.log(name, prop_signature);
+  // if (!prop_signature) {
+  //   return '';
+  // }
+  // const type_operators = _get_nested_of_type(
+  //   prop_signature,
+  //   ts.SyntaxKind.TypeOperator
+  // );
+  // if (type_operators.length > 0 && type_operators[0]) {
+  //   const type_op = type_operators[0];
+  //   return type_op.getText();
+  // }
+  // const type_references = _get_nested_of_type(
+  //   prop_signature,
+  //   ts.SyntaxKind.TypeReference
+  // );
+  // if (type_references.length === 0 || !type_references[0]) {
+  //   return '';
+  // }
+  // const type_ref = type_references[0];
+  // return type_ref.getText();
+  const type_operators = _get_nested_of_type(node, ts.SyntaxKind.TypeOperator);
+  if (type_operators.length > 0 && type_operators[0]) {
+    const type_op = type_operators[0];
+    return type_op.getText();
+  }
+  const type_references = _get_nested_of_type(
+    node,
+    ts.SyntaxKind.TypeReference
+  );
+  if (type_references.length === 0 || !type_references[0]) {
+    return '';
+  }
+  const type_ref = type_references[0];
+  return type_ref.getText();
 }
 
-class Generator {
+export function _generate(_options?: Partial<GenerateOptions>) {
+  // const generator = new Generator(options);
+  // return generator.generate();
+}
+
+export class _Generator {
   private tjsg_schema_by_file = new Map<string, tjsg.Schema>();
   private tsconfig_path: string;
   private program: ts.Program;
@@ -191,7 +484,7 @@ class Generator {
       throw new Error(`Cannot generate schema for interface '${name}'`);
     }
     const definition = _get_definition(tjsg_schema, name);
-    let properties = _resolve_properties(name, definition);
+    let properties = _resolve_properties(definition, name);
     if (properties) {
       properties = _update_properties(properties, interface_node);
     }
@@ -276,7 +569,7 @@ class Generator {
       throw new Error(`Cannot generate schema for type '${name}'`);
     }
     const definition = _get_definition(tjsg_schema, name);
-    let properties = _resolve_properties(name, definition);
+    let properties = _resolve_properties(definition, name);
     if (properties) {
       properties = _update_properties(properties, type_node);
     }
@@ -373,6 +666,10 @@ function _update_properties(
   properties: types.Properties,
   node: ts.Node
 ): types.Properties {
+  // TODO: remvoe
+  // if (!node) {
+  //   return properties;
+  // }
   const property_signatures = _get_nested_of_type(
     node,
     ts.SyntaxKind.PropertySignature
@@ -430,15 +727,11 @@ function _get_definition(
   return definition;
 }
 
-function _resolve_type(
-  definition: tjsg.Schema,
-  name: string
-): types.Primitive | undefined {
+function _resolve_type(definition: tjsg.Schema, name: string): types.Primitive {
   const type = definition.type;
-  // console.log(definition);
   if (!type) {
     ion.warn(`Cannot resolve 'type' for '${name}'`);
-    return undefined;
+    throw new Error(`Cannot resolve type`);
   }
   switch (type) {
     case 'string': {
@@ -463,7 +756,7 @@ function _resolve_type(
       return 'array';
     }
   }
-  return 'undefined';
+  throw new Error(`Invalid definition type`);
 }
 
 function _resolve_items(definition: tjsg.Schema): types.Items | undefined {
@@ -474,15 +767,88 @@ function _resolve_items(definition: tjsg.Schema): types.Items | undefined {
   return items as any;
 }
 
+function _resolve_all_properties(
+  definition: tjsg.Schema,
+  node: ts.Node | undefined,
+  name: string
+) {
+  const tjs_properties = definition?.properties;
+  if (!tjs_properties) {
+    return undefined;
+  }
+  let properties: types.Properties = {};
+  for (const [key, value] of Object.entries(tjs_properties)) {
+    if (typeof value === 'boolean') {
+      continue;
+    }
+    properties[key] = _resolve_property(value, node, name, key);
+  }
+  return properties;
+}
+
+function _resolve_property(
+  prop_def: tjsg.Schema,
+  parent_node: ts.Node | undefined,
+  parent_name: string,
+  key: string
+) {
+  const type = _resolve_type(prop_def, `${parent_name}.${key}`);
+  const child_node = _resolve_property_signature_node(parent_node, key);
+  const property: types.Property = {
+    enum: _resolve_enum(prop_def.enum),
+    properties: _resolve_all_properties(
+      prop_def,
+      child_node,
+      `${parent_name}.${key}`
+    ),
+    type,
+    original: _resolve_original(child_node),
+  };
+  return utils.no_undefined(property);
+}
+
+function _resolve_property_signature_node(
+  node: ts.Node | undefined,
+  name: string
+): ts.Node | undefined {
+  if (!node) {
+    return undefined;
+  }
+  const property_signatures = _get_nested_of_type(
+    node,
+    ts.SyntaxKind.PropertySignature
+  ) as ts.PropertySignature[];
+  const prop_signature_map = new Map<string, ts.PropertySignature>();
+  for (const prop_sign of property_signatures) {
+    const identifiers = _get_nested_of_type(
+      prop_sign,
+      ts.SyntaxKind.Identifier
+    ) as ts.Identifier[];
+    const identifier = identifiers[0];
+    if (!identifier) {
+      throw new Error('Missing identifier for property signature');
+    }
+    const prop_name = identifier.getText();
+    prop_signature_map.set(prop_name, prop_sign);
+  }
+  const prop_signature = prop_signature_map.get(name);
+  if (!prop_signature) {
+    return undefined;
+    // throw new Error(`Cannot find property signature node`);
+  }
+  return prop_signature;
+}
+
 function _resolve_properties(
-  name: string,
-  definition?: tjsg.Schema
+  definition: tjsg.Schema,
+  name: string
+  // node: ts.Node
 ): types.Properties | undefined {
   const tjs_properties = definition?.properties;
   if (!tjs_properties) {
     return undefined;
   }
-  const properties: types.Properties = {};
+  let properties: types.Properties = {};
   for (const [key, value] of Object.entries(tjs_properties)) {
     if (typeof value === 'boolean') {
       continue;
@@ -491,9 +857,10 @@ function _resolve_properties(
     if (!type) {
       return undefined;
     }
+    // const child_node = _get_child_node(node, key);
     const property: types.Property = {
       enum: _resolve_enum(value.enum),
-      properties: _resolve_properties(`${name}.${key}`, value),
+      properties: _resolve_properties(value, `${name}.${key}`),
       type,
     };
     properties[key] = utils.no_undefined(property);
@@ -501,8 +868,15 @@ function _resolve_properties(
   if (Object.keys(properties).length === 0) {
     return undefined;
   }
+  // if (properties) {
+  //   properties = _update_properties(properties, node);
+  // }
   return properties;
 }
+
+// function _get_child_node(_node?: ts.Node, _key?: string): ts.Node | undefined {
+//   return undefined;
+// }
 
 function _resolve_enum(tjs_enum?: unknown[]): types.Primitive[] | undefined {
   if (!tjs_enum) {
