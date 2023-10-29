@@ -622,7 +622,7 @@ function _resolve_property(prop_def, parent_node, parent_name, key) {
         enum: _resolve_enum(prop_def.enum),
         properties: _resolve_all_properties(prop_def, child_node, `${parent_name}.${key}`),
         type,
-        original: _resolve_original(child_node)
+        original: _resolve_original(child_node),
     };
     return utils.no_undefined(property);
 }
