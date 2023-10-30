@@ -57,4 +57,4 @@ esac
 
 git push origin
 git push origin v$(node -p "require('./package.json').version")
-npm publish
+yarn publish
