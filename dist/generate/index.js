@@ -163,6 +163,8 @@ class Type {
     }
     _resolve_tjsg_schema() {
         const tjsg_type_schema = this.source_file.tjsg_generator.createSchema(this.name);
+        // console.log(JSON.stringify(tjsg_type_schema, null, 2));
+        ion.debug(tjsg_type_schema);
         return tjsg_type_schema;
     }
     _resolve_tjsg_definition() {
@@ -180,6 +182,7 @@ class Type {
         if (this.source_file.nodes.has(this.name)) {
             return this.source_file.nodes.get(this.name);
         }
+        console.log(this.source_file.imports);
         throw new Error(`Cannot resolve node`);
     }
     _resolve_imports() {
@@ -309,7 +312,8 @@ function _resolve_property(prop_def, parent_node, parent_name, key, source_file)
     const child_node = _resolve_property_signature_node(parent_node, key);
     if ('$ref' in prop_def) {
         const type_ref_name = _resolve_type_ref_name(prop_def, key);
-        const property = _resolve_references_property(type_ref_name, source_file);
+        const ref_source_file = _resolve_ref_source_file(type_ref_name, source_file, child_node);
+        const property = _resolve_references_property(type_ref_name, ref_source_file);
         property.original = _resolve_original(child_node);
         return utils.no_undefined(property);
     }
@@ -319,6 +323,23 @@ function _resolve_property(prop_def, parent_node, parent_name, key, source_file)
         original: _resolve_original(child_node),
     };
     return utils.no_undefined(property);
+}
+function _resolve_ref_source_file(type_ref_name, source_file, node) {
+    const type = source_file.nodes.get(type_ref_name);
+    if (type || !node) {
+        return source_file;
+    }
+    const child_text = node.getText();
+    for (const import_declaration of source_file.imports) {
+        const clause = import_declaration.clause;
+        if (child_text.indexOf(clause) !== -1) {
+            const other_source_file_path = path.resolve(path.dirname(source_file.path), import_declaration.module + '.ts');
+            const other_source_file = new SourceFile(other_source_file_path, source_file.project);
+            other_source_file.nodes.get(type_ref_name);
+            return other_source_file;
+        }
+    }
+    throw new Error(`Cannot find source file for ${type_ref_name}`);
 }
 function _resolve_type_ref_name(prop_def, prop_name) {
     const ref = prop_def.$ref;

@@ -58,4 +58,4 @@ esac
 git push origin
 VERSION=$(node -p "require('./package.json').version")
 git push origin v$VERSION
-yarn publish --version $VERSION
+yarn publish --new-version $VERSION
