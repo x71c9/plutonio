@@ -10,6 +10,6 @@ import { Project } from './project.js';
 export declare class Generator {
     projects: Map<string, Project>;
     constructor();
-    get_project(tsconfig_path: string): Project;
+    private get_project;
     generate(params: types.GenerateParams): types.TypeSchema;
 }

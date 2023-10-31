@@ -15,7 +15,7 @@ export class Generator {
   constructor() {
     ion.trace(`Creating a Generator...`);
   }
-  public get_project(tsconfig_path: string) {
+  private get_project(tsconfig_path: string) {
     ion.trace(`Getting a Project...`);
     if (this.projects.has(tsconfig_path)) {
       return this.projects.get(tsconfig_path) as Project;

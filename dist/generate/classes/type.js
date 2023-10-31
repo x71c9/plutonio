@@ -17,20 +17,88 @@ export class Type {
         ion.trace(`Creating Type ${name} ...`);
         this.tjsg_type_schema = this._resolve_tjsg_schema();
         this.tjsg_type_definition = this._resolve_tjsg_definition();
-        this.node = this._resolve_node();
+        this.wrap_node = this._resolve_node();
     }
     generate_schema() {
-        const text = this.node.node.getText();
+        const text = this.wrap_node.node.getText();
         const original = typeof text === 'string' && text !== '' ? text : undefined;
         const type_schema = {
+            imports: this._resolve_imports(),
             name: this.name,
             type: _resolve_type(this.tjsg_type_definition, this.name),
+            enum: _resolve_enum(this.tjsg_type_definition),
             original,
-            enum: _resolve_enum(this.tjsg_type_definition.enum),
-            imports: this._resolve_imports(),
-            properties: _resolve_all_properties(this.tjsg_type_definition, this.node.node, this.name, this.source_file),
+            properties: this._resolve_properties(),
+            // properties: _resolve_all_properties(
+            //   this.tjsg_type_definition,
+            //   this.wrap_node.node,
+            //   this.name,
+            //   this.source_file
+            // ),
         };
         return utils.no_undefined(type_schema);
+    }
+    _resolve_properties() {
+        const tjs_properties = this.tjsg_type_definition.properties;
+        if (!tjs_properties) {
+            return undefined;
+        }
+        let properties = {};
+        for (const [key, value] of Object.entries(tjs_properties)) {
+            if (typeof value === 'boolean') {
+                continue;
+            }
+            // properties[key] = _resolve_property(value, node, name, key, source_file);
+            const property = this._resolve_property(key, value);
+            if (!property) {
+                continue;
+            }
+            properties[key] = property;
+        }
+        return properties;
+    }
+    _resolve_property_from_definition(ref_name) {
+        var _a;
+        return (_a = this.tjsg_type_schema.definitions) === null || _a === void 0 ? void 0 : _a[ref_name];
+    }
+    _resolve_property(prop_name, prop_def) {
+        if ('$ref' in prop_def) {
+            const type_ref_name = _resolve_type_ref_name(prop_name, prop_def);
+            const tjsg_property = this._resolve_property_from_definition(type_ref_name);
+            if (!tjsg_property || typeof tjsg_property === 'boolean') {
+                throw new Error(`Cannot find $ref property ${type_ref_name}`);
+            }
+            const type = new Type(prop_name);
+            // console.log(tjsg_property);
+            // const property:types.Property = {
+            //   type: _resolve_type(tjsg_property, prop_name),
+            //   enum: _resolve_enum(tjsg_property),
+            //   // original?: string;
+            //   // properties: this._resolve_properties(),
+            // } as types.Property;
+            // return property;
+        }
+        // const child_node = _resolve_property_signature_node(parent_node, key);
+        // if ('$ref' in prop_def) {
+        //   const type_ref_name = _resolve_type_ref_name(prop_def, key);
+        //   const ref_source_file = _resolve_ref_source_file(
+        //     type_ref_name,
+        //     source_file,
+        //     child_node
+        //   );
+        //   const property = _resolve_references_property(
+        //     type_ref_name,
+        //     ref_source_file
+        //   );
+        //   property.original = _resolve_original(child_node);
+        //   return utils.no_undefined(property);
+        // }
+        // let property: types.Property = {
+        //   type: _resolve_type(prop_def, `${parent_name}.${key}`),
+        //   enum: _resolve_enum(prop_def.enum),
+        //   original: _resolve_original(child_node),
+        // };
+        // return utils.no_undefined(property);
     }
     _resolve_tjsg_schema() {
         const tjsg_type_schema = this.source_file.tjsg_generator.createSchema(this.name);
@@ -53,14 +121,13 @@ export class Type {
         if (this.source_file.nodes.has(this.name)) {
             return this.source_file.nodes.get(this.name);
         }
-        console.log(this.source_file.imports);
         throw new Error(`Cannot resolve node`);
     }
     _resolve_imports() {
         return this.source_file.imports;
     }
 }
-function _resolve_original(node) {
+export function _resolve_original(node) {
     if (!node) {
         return undefined;
     }
@@ -114,37 +181,55 @@ function _resolve_type(definition, name) {
     }
     throw new Error(`Invalid definition type`);
 }
-function _resolve_all_properties(definition, node, name, source_file) {
-    const tjs_properties = definition === null || definition === void 0 ? void 0 : definition.properties;
-    if (!tjs_properties) {
-        return undefined;
-    }
-    let properties = {};
-    for (const [key, value] of Object.entries(tjs_properties)) {
-        if (typeof value === 'boolean') {
-            continue;
-        }
-        properties[key] = _resolve_property(value, node, name, key, source_file);
-    }
-    return properties;
-}
-function _resolve_property(prop_def, parent_node, parent_name, key, source_file) {
-    const child_node = _resolve_property_signature_node(parent_node, key);
-    if ('$ref' in prop_def) {
-        const type_ref_name = _resolve_type_ref_name(prop_def, key);
-        const ref_source_file = _resolve_ref_source_file(type_ref_name, source_file, child_node);
-        const property = _resolve_references_property(type_ref_name, ref_source_file);
-        property.original = _resolve_original(child_node);
-        return utils.no_undefined(property);
-    }
-    let property = {
-        type: _resolve_type(prop_def, `${parent_name}.${key}`),
-        enum: _resolve_enum(prop_def.enum),
-        original: _resolve_original(child_node),
-    };
-    return utils.no_undefined(property);
-}
-function _resolve_ref_source_file(type_ref_name, source_file, node) {
+// function _resolve_all_properties(
+//   definition: tjsg.Schema,
+//   node: ts.Node | undefined,
+//   name: string,
+//   source_file: SourceFile
+// ) {
+//   const tjs_properties = definition?.properties;
+//   if (!tjs_properties) {
+//     return undefined;
+//   }
+//   let properties: types.Properties = {};
+//   for (const [key, value] of Object.entries(tjs_properties)) {
+//     if (typeof value === 'boolean') {
+//       continue;
+//     }
+//     properties[key] = _resolve_property(value, node, name, key, source_file);
+//   }
+//   return properties;
+// }
+// export function _resolve_property(
+//   prop_def: tjsg.Schema,
+//   parent_node: ts.Node | undefined,
+//   parent_name: string,
+//   key: string,
+//   source_file: SourceFile
+// ) {
+//   const child_node = _resolve_property_signature_node(parent_node, key);
+//   if ('$ref' in prop_def) {
+//     const type_ref_name = _resolve_type_ref_name(prop_def, key);
+//     const ref_source_file = _resolve_ref_source_file(
+//       type_ref_name,
+//       source_file,
+//       child_node
+//     );
+//     const property = _resolve_references_property(
+//       type_ref_name,
+//       ref_source_file
+//     );
+//     property.original = _resolve_original(child_node);
+//     return utils.no_undefined(property);
+//   }
+//   let property: types.Property = {
+//     type: _resolve_type(prop_def, `${parent_name}.${key}`),
+//     enum: _resolve_enum(prop_def.enum),
+//     original: _resolve_original(child_node),
+//   };
+//   return utils.no_undefined(property);
+// }
+export function _resolve_ref_source_file(type_ref_name, source_file, node) {
     const type = source_file.nodes.get(type_ref_name);
     if (type || !node) {
         return source_file;
@@ -161,7 +246,7 @@ function _resolve_ref_source_file(type_ref_name, source_file, node) {
     }
     throw new Error(`Cannot find source file for ${type_ref_name}`);
 }
-function _resolve_type_ref_name(prop_def, prop_name) {
+function _resolve_type_ref_name(prop_name, prop_def) {
     const ref = prop_def.$ref;
     if (typeof ref !== 'string' || ref === '') {
         throw new Error(`Invalid $ref value`);
@@ -174,11 +259,11 @@ function _resolve_type_ref_name(prop_def, prop_name) {
     const ref_name = ref.replace(`#/definitions/`, '');
     return ref_name;
 }
-function _resolve_references_property(name, source_file) {
+export function _resolve_references_property(name, source_file) {
     const type = new Type(name, source_file);
     return type.generate_schema();
 }
-function _resolve_property_signature_node(node, name) {
+export function _resolve_property_signature_node(node, name) {
     if (!node) {
         return undefined;
     }
@@ -200,11 +285,12 @@ function _resolve_property_signature_node(node, name) {
     }
     return prop_signature;
 }
-function _resolve_enum(tjs_enum) {
-    if (!tjs_enum) {
+function _resolve_enum(definition) {
+    const enum_value = definition.enum;
+    if (!enum_value) {
         return undefined;
     }
     // TODO Check all possibilities
-    return tjs_enum;
+    return enum_value;
 }
 //# sourceMappingURL=type.js.map
