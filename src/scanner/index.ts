@@ -49,7 +49,7 @@ export function scanner() {
     const scanned_types: t.Types = {};
     for (const typ of types) {
       const type_name = _get_name(typ);
-      scanned_types[type_name] = _resolve_type(typ, type_name);
+      scanned_types[type_name] = _resolve_node(typ, type_name);
     }
     console.log(JSON.stringify(scanned_types, null, 2));
     // const scanned_interfaces:t.Interfaces = {};
@@ -61,20 +61,109 @@ export function scanner() {
   }
 }
 
-function _resolve_type(node: ts.Node, name: string): t.Type {
+function _resolve_node(node: ts.Node, name: string): t.Type {
+  const type_attributes = _resolve_type_attributes(node);
   const scanned_type: t.Type = {
     name,
-    kind: t.KIND.TYPE,
+    kind: _resolve_kind(node),
+    ...type_attributes,
+  };
+  return utils.no_undefined(scanned_type);
+}
+
+function _resolve_kind(node: ts.Node): t.Kind {
+  if (ts.isTypeAliasDeclaration(node)) {
+    return t.KIND.TYPE;
+  }
+  if (ts.isInterfaceDeclaration(node)) {
+    return t.KIND.INTERFACE;
+  }
+  throw new Error(`Cannot resolve KIND`);
+}
+
+function _resolve_type_attributes(node: ts.Node): t.TypeAttributes {
+  if (_is_type_reference(node)) {
+    return _resolve_type_attribute_for_type_reference(node);
+  }
+  const type_attributes: t.TypeAttributes = {
     primitive: _resolve_primitive(node),
-    array: _resolve_array(node),
     properties: _resolve_properties(node),
-    original: '',
-    enum: [],
+    item: _resolve_item(node),
+    original: _resolve_original(node),
+    // enum: [],
     // original: _resolve_original(),
     // enum: _resolve_enum(),
     // properties: undefined,
   };
-  return utils.no_undefined(scanned_type);
+  return utils.no_undefined(type_attributes);
+}
+
+function _resolve_original(node: ts.Node): string {
+  return node.getText();
+}
+
+function _resolve_item(node: ts.Node): t.TypeAttributes | undefined {
+  const array_type = _get_first_level_child(node, ts.SyntaxKind.ArrayType);
+  if (array_type) {
+    return _resolve_type_attributes(array_type);
+  }
+  const type_reference = _get_first_level_child(
+    node,
+    ts.SyntaxKind.TypeReference
+  );
+  // Check same login in _node_type_is_array
+  if (type_reference) {
+    const identifier = _get_first_level_child(
+      type_reference,
+      ts.SyntaxKind.Identifier
+    ) as ts.Identifier;
+    if (!identifier) {
+      return undefined;
+    }
+    const name = identifier.escapedText;
+    if (name === 'Array') {
+      const syntax_list = _get_first_level_child(
+        type_reference,
+        ts.SyntaxKind.SyntaxList
+      );
+      if (syntax_list) {
+        return _resolve_type_attributes(syntax_list);
+      }
+    }
+  }
+  return undefined;
+}
+
+function _is_type_reference(node: ts.Node): boolean {
+  if (_has_first_level_child(node, ts.SyntaxKind.TypeReference)) {
+    return true;
+  }
+  return false;
+}
+
+function _node_type_is_array(node: ts.Node): boolean {
+  if (_has_first_level_child(node, ts.SyntaxKind.ArrayType)) {
+    return true;
+  }
+  const type_reference = _get_first_level_child(
+    node,
+    ts.SyntaxKind.TypeReference
+  );
+  // Check same login in _resolve_item
+  if (type_reference) {
+    const identifier = _get_first_level_child(
+      type_reference,
+      ts.SyntaxKind.Identifier
+    ) as ts.Identifier;
+    if (!identifier) {
+      return false;
+    }
+    const name = identifier.escapedText;
+    if (name === 'Array') {
+      return true;
+    }
+  }
+  return false;
 }
 
 function _resolve_properties(node: ts.Node): t.Properties | undefined {
@@ -97,6 +186,11 @@ function _resolve_properties(node: ts.Node): t.Properties | undefined {
   ) as ts.PropertySignature[];
   for (const property_signature of property_signatures) {
     const property_name = _get_name(property_signature);
+    if (_is_type_reference(property_signature)) {
+      properties[property_name] =
+        _resolve_type_attribute_for_type_reference(property_signature);
+      continue;
+    }
     properties[property_name] = _resolve_property(property_signature);
   }
   return properties;
@@ -104,25 +198,72 @@ function _resolve_properties(node: ts.Node): t.Properties | undefined {
 
 function _resolve_property(property: ts.PropertySignature): t.TypeAttributes {
   const type_attribute: t.TypeAttributes = {
-    original: '',
-    // original: _resolve_original(property),
+    item: _resolve_item(property),
+    original: _resolve_original(property),
     primitive: _resolve_primitive(property),
-    array: _resolve_array(property),
-    enum: [],
     // enum: _resolve_enum(property),
     properties: _resolve_properties(property),
   };
   return utils.no_undefined(type_attribute);
 }
 
-function _resolve_array(node: ts.Node): boolean {
-  if (_has_first_level_child(node, ts.SyntaxKind.ArrayType)) {
-    return true;
+function _resolve_type_attribute_for_type_reference(
+  node: ts.Node
+): t.TypeAttributes {
+  const type_reference = _get_first_level_child(
+    node,
+    ts.SyntaxKind.TypeReference
+  );
+  if (!type_reference) {
+    return _unknown_type_reference(node);
   }
-  return false;
+  const node_type = checker.getTypeAtLocation(type_reference);
+  const node_type_node = node_type.aliasSymbol?.declarations?.[0];
+  if (node_type_node) {
+    const resolved = _resolve_type_attributes(node_type_node);
+    return resolved;
+  }
+  return _resolve_primitive_type_reference(node_type, type_reference);
 }
 
+function _resolve_primitive_type_reference(
+  node_type: ts.Type,
+  node: ts.Node
+): t.TypeAttributes {
+  const type_attribute: t.TypeAttributes = {
+    original: _resolve_original(node),
+    primitive: _resolve_primitive_of_type(node_type),
+  };
+  return utils.no_undefined(type_attribute);
+}
+
+function _resolve_primitive_of_type(node_type: ts.Type): t.Primitive {
+  console.log();
+  const a = node_type.isStringLiteral();
+  console.log(a);
+  return t.PRIMITIVE.UNKNOWN;
+}
+
+function _unknown_type_reference(node: ts.Node): t.TypeAttributes {
+  const type_attribute: t.TypeAttributes = {
+    original: _resolve_original(node),
+    primitive: t.PRIMITIVE.UNKNOWN,
+  };
+  return utils.no_undefined(type_attribute);
+}
+
+// function _resolve_primitive_for_type_reference(node: ts.Node): t.Primitive {
+//   const type_attributes = _resolve_type_attribute_for_type_reference(node);
+//   return type_attributes.primitive;
+// }
+
 function _resolve_primitive(node: ts.Node): t.Primitive {
+  // if (_is_type_reference(node)) {
+  //   return _resolve_primitive_for_type_reference(node);
+  // }
+  if (_node_type_is_array(node)) {
+    return t.PRIMITIVE.ARRAY;
+  }
   if (_node_type_is_boolean(node)) {
     return t.PRIMITIVE.BOOLEAN;
   }
@@ -144,7 +285,7 @@ function _resolve_primitive(node: ts.Node): t.Primitive {
   if (_node_type_is_undefined(node)) {
     return t.PRIMITIVE.UNDEFINED;
   }
-  return t.PRIMITIVE.UNKOWN;
+  return t.PRIMITIVE.UNKNOWN;
 }
 
 function _node_type_is_object(node: ts.Node): boolean {

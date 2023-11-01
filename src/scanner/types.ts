@@ -60,18 +60,19 @@ export type Properties = {
 export type TypeAttributes = {
   original: string;
   primitive: Primitive;
-  array: boolean;
+  item?: TypeAttributes;
   enum?: Enum[];
   properties?: Properties;
 };
 
 export const PRIMITIVE = {
+  ARRAY: 'array',
   BOOLEAN: 'boolean',
   NUMBER: 'number',
   STRING: 'string',
   OBJECT: 'object',
   ANY: 'any',
-  UNKOWN: 'unkown',
+  UNKNOWN: 'unknown',
   NULL: 'null',
   UNDEFINED: 'undefined',
 };

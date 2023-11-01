@@ -46,17 +46,18 @@ export type Properties = {
 export type TypeAttributes = {
     original: string;
     primitive: Primitive;
-    array: boolean;
+    item?: TypeAttributes;
     enum?: Enum[];
     properties?: Properties;
 };
 export declare const PRIMITIVE: {
+    ARRAY: string;
     BOOLEAN: string;
     NUMBER: string;
     STRING: string;
     OBJECT: string;
     ANY: string;
-    UNKOWN: string;
+    UNKNOWN: string;
     NULL: string;
     UNDEFINED: string;
 };

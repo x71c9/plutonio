@@ -9,12 +9,13 @@ export const KIND = {
     INTERFACE: 'interface',
 };
 export const PRIMITIVE = {
+    ARRAY: 'array',
     BOOLEAN: 'boolean',
     NUMBER: 'number',
     STRING: 'string',
     OBJECT: 'object',
     ANY: 'any',
-    UNKOWN: 'unkown',
+    UNKNOWN: 'unknown',
     NULL: 'null',
     UNDEFINED: 'undefined',
 };
