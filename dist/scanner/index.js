@@ -9,6 +9,7 @@ import path from 'path';
 import * as utils from '../utils/index.js';
 import ts from 'typescript';
 import * as t from './types.js';
+const known_type_reference = ['Array', 'Record'];
 let checker;
 export function scanner() {
     const tsconfig_path = `/Users/x71c9/repos/plutonio/builder/tsconfig.json`;
@@ -69,31 +70,31 @@ function _resolve_kind(node) {
     throw new Error(`Cannot resolve KIND`);
 }
 function _resolve_type_attributes(node) {
-    // if (_is_type_reference(node)) {
-    //   return _resolve_type_attribute_for_type_reference(node);
-    // }
+    if (_is_node_custom_type_reference(node)) {
+        const type_attributes = _resolve_type_attributes_for_type_reference(node);
+        type_attributes.original = _resolve_original(node);
+        return type_attributes;
+    }
     const type_attributes = {
         primitive: _resolve_primitive(node),
         properties: _resolve_properties(node),
         item: _resolve_item(node),
-        original: '',
-        // original: _resolve_original(node),
-        // enum: [],
+        original: _resolve_original(node),
         // enum: _resolve_enum(),
         // properties: undefined,
     };
     return utils.no_undefined(type_attributes);
 }
-// function _resolve_original(node: ts.Node): string {
-//   return node.getText();
-// }
+function _resolve_original(node) {
+    return node.getText();
+}
 function _resolve_item(node) {
     const array_type = _get_first_level_child(node, ts.SyntaxKind.ArrayType);
     if (array_type) {
         return _resolve_type_attributes(array_type);
     }
     const type_reference = _get_first_level_child(node, ts.SyntaxKind.TypeReference);
-    // Check same login in _node_type_is_array
+    // Check same logic in _node_type_is_array
     if (type_reference) {
         const identifier = _get_first_level_child(type_reference, ts.SyntaxKind.Identifier);
         if (!identifier) {
@@ -109,18 +110,41 @@ function _resolve_item(node) {
     }
     return undefined;
 }
-function _is_type_reference(node) {
-    if (_has_first_level_child(node, ts.SyntaxKind.TypeReference)) {
+function _is_node_custom_type_reference(node) {
+    const type_reference = _get_first_level_child(node, ts.SyntaxKind.TypeReference);
+    if (!type_reference) {
+        return false;
+    }
+    if (_node_type_is_known_reference(type_reference)) {
+        return false;
+    }
+    return true;
+}
+function _node_type_is_known_reference(node) {
+    const name = _get_type_first_identifier_name(node);
+    if (!name) {
+        return false;
+    }
+    if (known_type_reference.includes(name)) {
         return true;
     }
     return false;
+}
+function _get_type_first_identifier_name(node) {
+    // Check same logic in _resolve_item
+    const identifier = _get_first_level_child(node, ts.SyntaxKind.Identifier);
+    if (!identifier) {
+        return undefined;
+    }
+    const name = identifier.escapedText;
+    return name || undefined;
 }
 function _node_type_is_array(node) {
     if (_has_first_level_child(node, ts.SyntaxKind.ArrayType)) {
         return true;
     }
     const type_reference = _get_first_level_child(node, ts.SyntaxKind.TypeReference);
-    // Check same login in _resolve_item
+    // Check same logic in _resolve_item
     if (type_reference) {
         const identifier = _get_first_level_child(type_reference, ts.SyntaxKind.Identifier);
         if (!identifier) {
@@ -147,27 +171,29 @@ function _resolve_properties(node) {
     const property_signatures = _get_first_level_children(syntax_list, ts.SyntaxKind.PropertySignature);
     for (const property_signature of property_signatures) {
         const property_name = _get_name(property_signature);
-        if (_is_type_reference(property_signature)) {
-            properties[property_name] =
-                _resolve_type_attribute_for_type_reference(property_signature);
+        if (_is_node_custom_type_reference(property_signature)) {
+            const property_attributes = _resolve_type_attributes_for_type_reference(property_signature);
+            property_attributes.original = _resolve_original(property_signature);
+            properties[property_name] = property_attributes;
             continue;
         }
         properties[property_name] = _resolve_property(property_signature);
     }
     return properties;
 }
+// function _is_custom_type_reference(type_reference: ts.TypeReference): boolean {
+// }
 function _resolve_property(property) {
     const type_attribute = {
         item: _resolve_item(property),
-        // original: _resolve_original(property),
-        original: '',
+        original: _resolve_original(property),
         primitive: _resolve_primitive(property),
         // enum: _resolve_enum(property),
         properties: _resolve_properties(property),
     };
     return utils.no_undefined(type_attribute);
 }
-function _resolve_type_attribute_for_type_reference(node) {
+function _resolve_type_attributes_for_type_reference(node) {
     var _a, _b;
     const type_reference = _get_first_level_child(node, ts.SyntaxKind.TypeReference);
     if (!type_reference) {
@@ -181,10 +207,9 @@ function _resolve_type_attribute_for_type_reference(node) {
     }
     return _resolve_primitive_type_reference(node_type, type_reference);
 }
-function _resolve_primitive_type_reference(node_type, _node) {
+function _resolve_primitive_type_reference(node_type, node) {
     const type_attribute = {
-        // original: _resolve_original(node),
-        original: '',
+        original: _resolve_original(node),
         primitive: _resolve_primitive_of_simple_type(node_type),
     };
     return utils.no_undefined(type_attribute);
@@ -203,13 +228,10 @@ function _unknown_type_reference(_node) {
     return utils.no_undefined(type_attribute);
 }
 // function _resolve_primitive_for_type_reference(node: ts.Node): t.Primitive {
-//   const type_attributes = _resolve_type_attribute_for_type_reference(node);
+//   const type_attributes = _resolve_type_attributes_for_type_reference(node);
 //   return type_attributes.primitive;
 // }
 function _resolve_primitive(node) {
-    // if (_is_type_reference(node)) {
-    //   return _resolve_primitive_for_type_reference(node);
-    // }
     if (_node_type_is_array(node)) {
         return t.PRIMITIVE.ARRAY;
     }
