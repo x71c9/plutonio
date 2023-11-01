@@ -69,24 +69,24 @@ function _resolve_kind(node) {
     throw new Error(`Cannot resolve KIND`);
 }
 function _resolve_type_attributes(node) {
-    if (_is_type_reference(node)) {
-        return _resolve_type_attribute_for_type_reference(node);
-    }
+    // if (_is_type_reference(node)) {
+    //   return _resolve_type_attribute_for_type_reference(node);
+    // }
     const type_attributes = {
         primitive: _resolve_primitive(node),
         properties: _resolve_properties(node),
         item: _resolve_item(node),
-        original: _resolve_original(node),
+        original: '',
+        // original: _resolve_original(node),
         // enum: [],
-        // original: _resolve_original(),
         // enum: _resolve_enum(),
         // properties: undefined,
     };
     return utils.no_undefined(type_attributes);
 }
-function _resolve_original(node) {
-    return node.getText();
-}
+// function _resolve_original(node: ts.Node): string {
+//   return node.getText();
+// }
 function _resolve_item(node) {
     const array_type = _get_first_level_child(node, ts.SyntaxKind.ArrayType);
     if (array_type) {
@@ -159,7 +159,8 @@ function _resolve_properties(node) {
 function _resolve_property(property) {
     const type_attribute = {
         item: _resolve_item(property),
-        original: _resolve_original(property),
+        // original: _resolve_original(property),
+        original: '',
         primitive: _resolve_primitive(property),
         // enum: _resolve_enum(property),
         properties: _resolve_properties(property),
@@ -180,22 +181,23 @@ function _resolve_type_attribute_for_type_reference(node) {
     }
     return _resolve_primitive_type_reference(node_type, type_reference);
 }
-function _resolve_primitive_type_reference(node_type, node) {
+function _resolve_primitive_type_reference(node_type, _node) {
     const type_attribute = {
-        original: _resolve_original(node),
-        primitive: _resolve_primitive_of_type(node_type)
+        // original: _resolve_original(node),
+        original: '',
+        primitive: _resolve_primitive_of_simple_type(node_type),
     };
     return utils.no_undefined(type_attribute);
 }
-function _resolve_primitive_of_type(node_type) {
-    console.log();
-    const a = node_type.isStringLiteral();
-    console.log(a);
-    return t.PRIMITIVE.UNKNOWN;
+function _resolve_primitive_of_simple_type(node_type) {
+    // TODO: Fix
+    const primitive = node_type.intrinsicName;
+    return primitive;
 }
-function _unknown_type_reference(node) {
+function _unknown_type_reference(_node) {
     const type_attribute = {
-        original: _resolve_original(node),
+        // original: _resolve_original(node),
+        original: '',
         primitive: t.PRIMITIVE.UNKNOWN,
     };
     return utils.no_undefined(type_attribute);

@@ -82,25 +82,25 @@ function _resolve_kind(node: ts.Node): t.Kind {
 }
 
 function _resolve_type_attributes(node: ts.Node): t.TypeAttributes {
-  if (_is_type_reference(node)) {
-    return _resolve_type_attribute_for_type_reference(node);
-  }
+  // if (_is_type_reference(node)) {
+  //   return _resolve_type_attribute_for_type_reference(node);
+  // }
   const type_attributes: t.TypeAttributes = {
     primitive: _resolve_primitive(node),
     properties: _resolve_properties(node),
     item: _resolve_item(node),
-    original: _resolve_original(node),
+    original: '',
+    // original: _resolve_original(node),
     // enum: [],
-    // original: _resolve_original(),
     // enum: _resolve_enum(),
     // properties: undefined,
   };
   return utils.no_undefined(type_attributes);
 }
 
-function _resolve_original(node: ts.Node): string {
-  return node.getText();
-}
+// function _resolve_original(node: ts.Node): string {
+//   return node.getText();
+// }
 
 function _resolve_item(node: ts.Node): t.TypeAttributes | undefined {
   const array_type = _get_first_level_child(node, ts.SyntaxKind.ArrayType);
@@ -199,7 +199,8 @@ function _resolve_properties(node: ts.Node): t.Properties | undefined {
 function _resolve_property(property: ts.PropertySignature): t.TypeAttributes {
   const type_attribute: t.TypeAttributes = {
     item: _resolve_item(property),
-    original: _resolve_original(property),
+    // original: _resolve_original(property),
+    original: '',
     primitive: _resolve_primitive(property),
     // enum: _resolve_enum(property),
     properties: _resolve_properties(property),
@@ -228,25 +229,26 @@ function _resolve_type_attribute_for_type_reference(
 
 function _resolve_primitive_type_reference(
   node_type: ts.Type,
-  node: ts.Node
+  _node?: ts.Node
 ): t.TypeAttributes {
   const type_attribute: t.TypeAttributes = {
-    original: _resolve_original(node),
-    primitive: _resolve_primitive_of_type(node_type),
+    // original: _resolve_original(node),
+    original: '',
+    primitive: _resolve_primitive_of_simple_type(node_type),
   };
   return utils.no_undefined(type_attribute);
 }
 
-function _resolve_primitive_of_type(node_type: ts.Type): t.Primitive {
-  console.log();
-  const a = node_type.isStringLiteral();
-  console.log(a);
-  return t.PRIMITIVE.UNKNOWN;
+function _resolve_primitive_of_simple_type(node_type: ts.Type): t.Primitive {
+  // TODO: Fix
+  const primitive = (node_type as any).intrinsicName;
+  return primitive;
 }
 
-function _unknown_type_reference(node: ts.Node): t.TypeAttributes {
+function _unknown_type_reference(_node: ts.Node): t.TypeAttributes {
   const type_attribute: t.TypeAttributes = {
-    original: _resolve_original(node),
+    // original: _resolve_original(node),
+    original: '',
     primitive: t.PRIMITIVE.UNKNOWN,
   };
   return utils.no_undefined(type_attribute);
