@@ -68,7 +68,8 @@ export class Type {
             if (!tjsg_property || typeof tjsg_property === 'boolean') {
                 throw new Error(`Cannot find $ref property ${type_ref_name}`);
             }
-            const type = new Type(prop_name);
+            // TODO
+            return undefined;
             // console.log(tjsg_property);
             // const property:types.Property = {
             //   type: _resolve_type(tjsg_property, prop_name),

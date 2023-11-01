@@ -10,11 +10,11 @@ import * as types from '../types.js';
 import { SourceFile } from './source_file.js';
 export declare class Type {
     name: string;
-    source_file?: SourceFile | undefined;
+    source_file: SourceFile;
     private wrap_node;
     private tjsg_type_schema;
     private tjsg_type_definition;
-    constructor(name: string, source_file?: SourceFile | undefined);
+    constructor(name: string, source_file: SourceFile);
     generate_schema(): types.TypeSchema;
     private _resolve_properties;
     private _resolve_property_from_definition;
