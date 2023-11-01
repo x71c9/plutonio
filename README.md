@@ -20,13 +20,6 @@ type Schema = {
 
 type Category = 'type' | 'interface';
 
-type Import = {
-  clause: string;
-  module: string;
-  specifiers: string[];
-  text: string;
-};
-
 type Primitive =
   | 'any';
   | 'boolean'
