@@ -541,7 +541,10 @@ function _resolve_primitive(node: ts.Node): t.Primitive {
   if (_node_type_is_undefined(node)) {
     return t.PRIMITIVE.UNDEFINED;
   }
-  return t.PRIMITIVE.UNKNOWN;
+  if (_node_type_is_unknown(node)) {
+    return t.PRIMITIVE.UNKNOWN;
+  }
+  return t.PRIMITIVE.UNRESOLVED;
 }
 
 function _node_type_is_object(node: ts.Node): boolean {
@@ -591,6 +594,13 @@ function _node_type_is_any(node: ts.Node): boolean {
 
 function _node_type_is_null(node: ts.Node): boolean {
   if (_has_first_level_child(node, ts.SyntaxKind.NullKeyword)) {
+    return true;
+  }
+  return false;
+}
+
+function _node_type_is_unknown(node: ts.Node): boolean {
+  if (_has_first_level_child(node, ts.SyntaxKind.UnknownKeyword)) {
     return true;
   }
   return false;

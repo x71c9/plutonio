@@ -68,6 +68,7 @@ export declare const PRIMITIVE: {
     UNKNOWN: string;
     NULL: string;
     UNDEFINED: string;
+    UNRESOLVED: string;
 };
 export type Primitive = ObjectValue<typeof PRIMITIVE>;
 export type Values = (string | number)[];

@@ -86,6 +86,7 @@ export const PRIMITIVE = {
   UNKNOWN: 'unknown',
   NULL: 'null',
   UNDEFINED: 'undefined',
+  UNRESOLVED: 'unresolved',
 };
 
 export type Primitive = ObjectValue<typeof PRIMITIVE>;

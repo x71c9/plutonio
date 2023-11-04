@@ -20,5 +20,6 @@ export const PRIMITIVE = {
     UNKNOWN: 'unknown',
     NULL: 'null',
     UNDEFINED: 'undefined',
+    UNRESOLVED: 'unresolved',
 };
 //# sourceMappingURL=types.js.map
