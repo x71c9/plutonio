@@ -418,6 +418,9 @@ function _node_type_is_array(node: ts.Node): boolean {
 }
 
 function _resolve_properties(node: ts.Node): t.Properties | undefined {
+  if (_is_intersection(node)) {
+    return _resolve_intersection_properties(node);
+  }
   let properties: t.Properties | undefined;
   const type_literal = _get_first_level_child(node, ts.SyntaxKind.TypeLiteral);
   if (!type_literal) {
@@ -514,6 +517,9 @@ function _unknown_type_reference(_node: ts.Node): t.TypeAttributes {
 // }
 
 function _resolve_primitive(node: ts.Node): t.Primitive {
+  if (_is_intersection(node)) {
+    return _resolve_intersection_primitive(node);
+  }
   if (_node_type_is_enum(node)) {
     return t.PRIMITIVE.ENUM;
   }
@@ -545,6 +551,17 @@ function _resolve_primitive(node: ts.Node): t.Primitive {
     return t.PRIMITIVE.UNKNOWN;
   }
   return t.PRIMITIVE.UNRESOLVED;
+}
+
+function _is_intersection(node: ts.Node): boolean {
+  const intersection_node = _get_first_level_child(
+    node,
+    ts.SyntaxKind.IntersectionType
+  );
+  if (intersection_node) {
+    return true;
+  }
+  return false;
 }
 
 function _node_type_is_object(node: ts.Node): boolean {
@@ -613,16 +630,12 @@ function _node_type_is_undefined(node: ts.Node): boolean {
   return false;
 }
 
-// function _resolve_interface(node: ts.InterfaceDeclaration): t.Interace {
-
-// }
-
-export function _get_name(node: ts.Node & {name: ts.Node}): string {
+function _get_name(node: ts.Node & {name: ts.Node}): string {
   const symbol = checker.getSymbolAtLocation(node.name);
   return String(symbol?.escapedName);
 }
 
-export function _get_nested_children<T extends ts.Node>(
+function _get_nested_children<T extends ts.Node>(
   node: ts.Node,
   kind: ts.SyntaxKind
 ): T[] {
@@ -642,10 +655,7 @@ export function _get_nested_children<T extends ts.Node>(
   return nodes;
 }
 
-export function _has_first_level_child(
-  node: ts.Node,
-  kind: ts.SyntaxKind
-): boolean {
+function _has_first_level_child(node: ts.Node, kind: ts.SyntaxKind): boolean {
   const children = node.getChildren();
   for (let i = 0; i < children.length; i++) {
     const child = children[i];
@@ -659,7 +669,7 @@ export function _has_first_level_child(
   return false;
 }
 
-export function _get_first_level_child<T extends ts.Node>(
+function _get_first_level_child<T extends ts.Node>(
   node: ts.Node,
   kind: ts.SyntaxKind
 ): T | undefined {
@@ -676,7 +686,7 @@ export function _get_first_level_child<T extends ts.Node>(
   return undefined;
 }
 
-export function _get_first_level_children<T extends ts.Node>(
+function _get_first_level_children<T extends ts.Node>(
   node: ts.Node,
   kind: ts.SyntaxKind
 ): T[] {
@@ -692,4 +702,139 @@ export function _get_first_level_children<T extends ts.Node>(
     }
   }
   return nodes;
+}
+
+// Method for solving primitive of interecetion type
+// Not clean method
+function _resolve_direct_node_primitive(node: ts.Node): t.Primitive {
+  if (ts.isTypeReferenceNode(node)) {
+    return _resolve_reference_node_primitive(node);
+  }
+  if (ts.isTypeLiteralNode(node)) {
+    return t.PRIMITIVE.OBJECT;
+  }
+  return t.PRIMITIVE.UNRESOLVED;
+}
+
+function _resolve_reference_node_primitive(node: ts.Node): t.Primitive {
+  const node_type = checker.getTypeAtLocation(node);
+  const node_type_node = node_type.aliasSymbol?.declarations?.[0];
+  if (node_type_node) {
+    const resolved = _resolve_type_attributes(node_type_node);
+    return resolved.primitive;
+  }
+  return t.PRIMITIVE.UNRESOLVED;
+}
+
+// Method for solving properties of interecetion type
+// Not clean method
+function _resolve_intersection_properties(
+  node: ts.Node
+): t.Properties | undefined {
+  const intersection_node = _get_first_level_child(
+    node,
+    ts.SyntaxKind.IntersectionType
+  ) as ts.IntersectionTypeNode | undefined;
+  if (!intersection_node) {
+    return undefined;
+  }
+  const syntax_list = _get_first_level_child(
+    intersection_node,
+    ts.SyntaxKind.SyntaxList
+  ) as ts.SyntaxList | undefined;
+  if (!syntax_list) {
+    return undefined;
+  }
+  const children = syntax_list.getChildren();
+  let properties: t.Properties = {};
+  for (let i = 0; i < children.length; i++) {
+    const child = children[i];
+    if (!child || child.kind === ts.SyntaxKind.AmpersandToken) {
+      continue;
+    }
+    const current_properties = _resolve_direct_node_properties(child);
+    properties = {
+      ...properties,
+      ...current_properties,
+    };
+  }
+  return properties;
+}
+
+// Method for solving properties of interecetion type
+// Not clean method
+function _resolve_direct_node_properties(
+  node: ts.Node
+): t.Properties | undefined {
+  if (ts.isTypeReferenceNode(node)) {
+    const node_type = checker.getTypeAtLocation(node);
+    const node_type_node = node_type.aliasSymbol?.declarations?.[0];
+    if (node_type_node) {
+      node = node_type_node;
+    }
+  }
+  let properties: t.Properties | undefined;
+  const syntax_list = _get_first_level_child(node, ts.SyntaxKind.SyntaxList);
+  if (!syntax_list) {
+    const type_literal = _get_first_level_child(
+      node,
+      ts.SyntaxKind.TypeLiteral
+    );
+    if (!type_literal) {
+      return undefined;
+    }
+    return _resolve_direct_node_properties(type_literal);
+  }
+  properties = {};
+  const property_signatures = _get_first_level_children(
+    syntax_list,
+    ts.SyntaxKind.PropertySignature
+  ) as ts.PropertySignature[];
+  for (const property_signature of property_signatures) {
+    const property_name = _get_name(property_signature);
+    if (_is_node_custom_type_reference(property_signature)) {
+      const property_attributes =
+        _resolve_type_attributes_for_type_reference(property_signature);
+      property_attributes.original = _resolve_original(property_signature);
+      properties[property_name] = property_attributes;
+      continue;
+    }
+    properties[property_name] = _resolve_property(property_signature);
+  }
+  return properties;
+}
+
+// Method for solving primitive of interecetion type
+// Not clean method
+function _resolve_intersection_primitive(node: ts.Node): t.Primitive {
+  const intersection_node = _get_first_level_child(
+    node,
+    ts.SyntaxKind.IntersectionType
+  ) as ts.IntersectionTypeNode | undefined;
+  if (!intersection_node) {
+    return t.PRIMITIVE.UNRESOLVED;
+  }
+  const syntax_list = _get_first_level_child(
+    intersection_node,
+    ts.SyntaxKind.SyntaxList
+  ) as ts.SyntaxList | undefined;
+  if (!syntax_list) {
+    return t.PRIMITIVE.UNRESOLVED;
+  }
+  const children = syntax_list.getChildren();
+  let first_primitive: t.Primitive = t.PRIMITIVE.UNRESOLVED;
+  for (let i = 0; i < children.length; i++) {
+    const child = children[i];
+    if (!child || child.kind === ts.SyntaxKind.AmpersandToken) {
+      continue;
+    }
+    const primitive = _resolve_direct_node_primitive(child);
+    if (first_primitive === t.PRIMITIVE.UNRESOLVED) {
+      first_primitive = primitive;
+    }
+    if (primitive !== first_primitive) {
+      return t.PRIMITIVE.UNRESOLVED;
+    }
+  }
+  return first_primitive;
 }
