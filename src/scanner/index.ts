@@ -36,36 +36,132 @@ export function scanner() {
   // SourceFile attached to and the system fails
   checker = program.getTypeChecker();
   const source_files = program.getSourceFiles();
+  const scanned: t.Scanned = {};
   for (const source_file of source_files) {
     if (source_file.isDeclarationFile) {
       continue;
     }
-    const types = _get_nested_children(
-      source_file,
-      ts.SyntaxKind.TypeAliasDeclaration
-    ) as ts.TypeAliasDeclaration[];
-    // const interfaces = _get_nested_children(
-    //   source_file,
-    //   ts.SyntaxKind.InterfaceDeclaration
-    // ) as ts.InterfaceDeclaration[];
-    const scanned_types: t.Types = {};
-    for (const typ of types) {
-      const type_name = _get_name(typ);
-      scanned_types[type_name] = _resolve_node(typ, type_name);
-    }
-    console.log(JSON.stringify(scanned_types, null, 2));
-    // const scanned_interfaces:t.Interfaces = {};
-    // for (const inter of interfaces) {
-    //   const inter_name = _get_name(inter);
-    //   console.log(inter_name);
-    //   scanned_interfaces[inter_name] = _resolve_interface(inter);
-    // }
+    const scanned_source_file: t.SourceFile = {
+      imports: _resolve_source_file_imports(source_file),
+      types: _resolve_source_file_part(
+        source_file,
+        ts.SyntaxKind.TypeAliasDeclaration
+      ),
+      interfaces: _resolve_source_file_part(
+        source_file,
+        ts.SyntaxKind.InterfaceDeclaration
+      ),
+      enums: _resolve_source_file_part(
+        source_file,
+        ts.SyntaxKind.EnumDeclaration
+      ),
+    };
+    scanned[source_file.fileName] = utils.no_undefined(scanned_source_file);
   }
+  return scanned;
 }
 
-function _resolve_node(node: ts.Node, name: string): t.Type {
+function _resolve_source_file_imports(
+  source_file: ts.SourceFile
+): t.Imports | undefined {
+  const import_declarations: ts.ImportDeclaration[] = _get_nested_children(
+    source_file,
+    ts.SyntaxKind.ImportDeclaration
+  );
+  const imports: t.Imports = {};
+  for (const import_declaration of import_declarations) {
+    const import_attributes = _resolve_import(import_declaration);
+    imports[import_attributes.module] = import_attributes;
+  }
+  if (Object.keys(imports).length < 1) {
+    return undefined;
+  }
+  return imports;
+}
+
+function _resolve_import(import_declaration: ts.ImportDeclaration): t.Import {
+  const text = import_declaration.getText();
+  const module = import_declaration.moduleSpecifier
+    .getText()
+    .replaceAll("'", '')
+    .replaceAll('"', '');
+  // i.e.: import * as plutonio from 'plutonio'
+  const namespace_imports = utils.get_nested_of_type(
+    import_declaration,
+    ts.SyntaxKind.NamespaceImport
+  ) as ts.NamespaceImport[];
+  if (namespace_imports.length > 0 && namespace_imports[0]) {
+    const namespace_import = namespace_imports[0];
+    const identifiers = utils.get_nested_of_type(
+      namespace_import,
+      ts.SyntaxKind.Identifier
+    ) as ts.Identifier[];
+    const identifier = identifiers[0];
+    if (!identifier) {
+      throw new Error(`Missing identifier in namespace import`);
+    }
+    const clause = identifier.getText();
+    return {
+      text,
+      module,
+      clause,
+      specifiers: [],
+    };
+  }
+  // i.e.: import {atom} from 'plutonio'
+  const import_specifiers = utils.get_nested_of_type(
+    import_declaration,
+    ts.SyntaxKind.ImportSpecifier
+  ) as ts.ImportSpecifier[];
+  if (import_specifiers.length > 0) {
+    const specifiers = import_specifiers.map((is) => is.getText());
+    return {
+      text,
+      module,
+      clause: '',
+      specifiers,
+    };
+  }
+  // i.e.: import plutonio from 'plutonio'
+  const import_clauses = utils.get_nested_of_type(
+    import_declaration,
+    ts.SyntaxKind.ImportClause
+  ) as ts.ImportClause[];
+  const import_clause = import_clauses[0];
+  if (!import_clause) {
+    throw new Error(`Missing import clause`);
+  }
+  const clause = import_clause.getText();
+  return {
+    text,
+    module,
+    clause,
+    specifiers: [],
+  };
+}
+
+function _resolve_source_file_part(
+  source_file: ts.SourceFile,
+  syntax_kind: ts.SyntaxKind
+) {
+  const nodes = _get_nested_children(source_file, syntax_kind) as
+    | ts.TypeAliasDeclaration[]
+    | ts.InterfaceDeclaration[]
+    | ts.EnumDeclaration[];
+  const scanned_nodes: t.Types | t.Interfaces | t.Enums = {};
+  for (const node of nodes) {
+    const name = _get_name(node);
+    scanned_nodes[name] = _resolve_node(node, name);
+  }
+  if (Object.keys(scanned_nodes).length < 1) {
+    return undefined;
+  }
+  return scanned_nodes;
+}
+
+function _resolve_node(node: ts.Node, name: string): t.Type | t.Interace {
   const type_attributes = _resolve_type_attributes(node);
-  const scanned_type: t.Type = {
+  const scanned_type: t.Type | t.Interace | t.Enums = {
     name,
     kind: _resolve_kind(node),
     ...type_attributes,
@@ -79,6 +175,9 @@ function _resolve_kind(node: ts.Node): t.Kind {
   }
   if (ts.isInterfaceDeclaration(node)) {
     return t.KIND.INTERFACE;
+  }
+  if (ts.isEnumDeclaration(node)) {
+    return t.KIND.ENUM;
   }
   throw new Error(`Cannot resolve KIND`);
 }
@@ -94,10 +193,86 @@ function _resolve_type_attributes(node: ts.Node): t.TypeAttributes {
     properties: _resolve_properties(node),
     item: _resolve_item(node),
     original: _resolve_original(node),
-    // enum: _resolve_enum(),
-    // properties: undefined,
+    values: _resolve_values(node),
   };
   return utils.no_undefined(type_attributes);
+}
+
+function _resolve_values(node: ts.Node): t.Values | undefined {
+  const enum_members = _get_nested_children(
+    node,
+    ts.SyntaxKind.EnumMember
+  ) as ts.EnumMember[];
+  if (Array.isArray(enum_members) && enum_members.length > 0) {
+    return _resolve_values_from_enum_members(enum_members);
+  }
+  const union_type = _get_first_level_child(node, ts.SyntaxKind.UnionType);
+  if (union_type) {
+    return _resolve_values_from_union_type(node);
+  }
+  return _resolve_values_from_keyof_keyword(node);
+}
+
+function _resolve_values_from_enum_members(enum_members: ts.EnumMember[]) {
+  const values: (string | number)[] = [];
+  for (const enum_member of enum_members) {
+    const type = checker.getTypeAtLocation(enum_member);
+    // TODO: fix any
+    const value = (type as any).value;
+    if (typeof value !== undefined) {
+      const final_value = typeof value === 'number' ? value : String(value);
+      values.push(final_value);
+    }
+  }
+  return values;
+}
+
+function _resolve_values_from_union_type(node: ts.Node): t.Values | undefined {
+  const union_type = _get_first_level_child(node, ts.SyntaxKind.UnionType);
+  if (!union_type) {
+    return undefined;
+  }
+  const type = checker.getTypeAtLocation(node) as ts.UnionType;
+  return _get_values_from_union_type(type);
+}
+
+function _get_values_from_union_type(type: ts.UnionType): t.Values | undefined {
+  const values: (string | number)[] = [];
+  for (const keytype of type.types) {
+    // TODO: fix any
+    const value = (keytype as any).value;
+    if (typeof value !== undefined) {
+      const final_value = typeof value === 'number' ? value : String(value);
+      if (value) {
+        values.push(final_value);
+      }
+    }
+  }
+  if (values.length > 0) {
+    return values;
+  }
+  return undefined;
+}
+
+function _resolve_values_from_keyof_keyword(
+  node: ts.Node
+): t.Values | undefined {
+  const type_operator = _get_first_level_child(
+    node,
+    ts.SyntaxKind.TypeOperator
+  );
+  if (!type_operator) {
+    return undefined;
+  }
+  const keyof_keyword = _get_first_level_child(
+    type_operator,
+    ts.SyntaxKind.KeyOfKeyword
+  );
+  if (!keyof_keyword) {
+    return undefined;
+  }
+  const type = checker.getTypeAtLocation(node) as ts.UnionType;
+  return _get_values_from_union_type(type);
 }
 
 function _resolve_original(node: ts.Node): string {
@@ -174,6 +349,49 @@ function _get_type_first_identifier_name(node: ts.Node): string | undefined {
   return name || undefined;
 }
 
+function _node_type_is_enum(node: ts.Node): boolean {
+  if (ts.isEnumDeclaration(node)) {
+    return true;
+  }
+  const type_operator = _get_first_level_child(
+    node,
+    ts.SyntaxKind.TypeOperator
+  );
+  if (type_operator) {
+    const keyof_keyword = _get_first_level_child(
+      type_operator,
+      ts.SyntaxKind.KeyOfKeyword
+    );
+    if (keyof_keyword) {
+      return true;
+    }
+  }
+  const union_type = _get_first_level_child(node, ts.SyntaxKind.UnionType) as
+    | ts.UnionTypeNode
+    | undefined;
+  if (union_type) {
+    return _is_union_type_an_enum(union_type);
+  }
+  return false;
+}
+
+function _is_union_type_an_enum(node: ts.UnionTypeNode): boolean {
+  const children = node.getChildren();
+  for (let i = 0; i < children.length; i++) {
+    const child = children[i];
+    if (!child) {
+      continue;
+    }
+    if (
+      child.kind !== ts.SyntaxKind.LiteralType &&
+      child.kind !== ts.SyntaxKind.BarToken
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function _node_type_is_array(node: ts.Node): boolean {
   if (_has_first_level_child(node, ts.SyntaxKind.ArrayType)) {
     return true;
@@ -239,7 +457,7 @@ function _resolve_property(property: ts.PropertySignature): t.TypeAttributes {
     item: _resolve_item(property),
     original: _resolve_original(property),
     primitive: _resolve_primitive(property),
-    // enum: _resolve_enum(property),
+    values: _resolve_values(property),
     properties: _resolve_properties(property),
   };
   return utils.no_undefined(type_attribute);
@@ -296,6 +514,9 @@ function _unknown_type_reference(_node: ts.Node): t.TypeAttributes {
 // }
 
 function _resolve_primitive(node: ts.Node): t.Primitive {
+  if (_node_type_is_enum(node)) {
+    return t.PRIMITIVE.ENUM;
+  }
   if (_node_type_is_array(node)) {
     return t.PRIMITIVE.ARRAY;
   }
@@ -326,6 +547,16 @@ function _resolve_primitive(node: ts.Node): t.Primitive {
 function _node_type_is_object(node: ts.Node): boolean {
   if (_has_first_level_child(node, ts.SyntaxKind.TypeLiteral)) {
     return true;
+  }
+  const type_reference = _get_first_level_child(
+    node,
+    ts.SyntaxKind.TypeReference
+  );
+  if (type_reference) {
+    const identifier_name = _get_type_first_identifier_name(type_reference);
+    if (identifier_name === 'Record') {
+      return true;
+    }
   }
   return false;
 }

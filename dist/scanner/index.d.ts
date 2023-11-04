@@ -6,7 +6,8 @@
  *
  */
 import ts from 'typescript';
-export declare function scanner(): void;
+import * as t from './types.js';
+export declare function scanner(): t.Scanned;
 export declare function _get_name(node: ts.Node & {
     name: ts.Node;
 }): string;

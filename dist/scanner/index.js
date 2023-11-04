@@ -28,28 +28,92 @@ export function scanner() {
     // SourceFile attached to and the system fails
     checker = program.getTypeChecker();
     const source_files = program.getSourceFiles();
+    const scanned = {};
     for (const source_file of source_files) {
         if (source_file.isDeclarationFile) {
             continue;
         }
-        const types = _get_nested_children(source_file, ts.SyntaxKind.TypeAliasDeclaration);
-        // const interfaces = _get_nested_children(
-        //   source_file,
-        //   ts.SyntaxKind.InterfaceDeclaration
-        // ) as ts.InterfaceDeclaration[];
-        const scanned_types = {};
-        for (const typ of types) {
-            const type_name = _get_name(typ);
-            scanned_types[type_name] = _resolve_node(typ, type_name);
-        }
-        console.log(JSON.stringify(scanned_types, null, 2));
-        // const scanned_interfaces:t.Interfaces = {};
-        // for (const inter of interfaces) {
-        //   const inter_name = _get_name(inter);
-        //   console.log(inter_name);
-        //   scanned_interfaces[inter_name] = _resolve_interface(inter);
-        // }
+        const scanned_source_file = {
+            imports: _resolve_source_file_imports(source_file),
+            types: _resolve_source_file_part(source_file, ts.SyntaxKind.TypeAliasDeclaration),
+            interfaces: _resolve_source_file_part(source_file, ts.SyntaxKind.InterfaceDeclaration),
+            enums: _resolve_source_file_part(source_file, ts.SyntaxKind.EnumDeclaration),
+        };
+        scanned[source_file.fileName] = utils.no_undefined(scanned_source_file);
     }
+    return scanned;
+}
+function _resolve_source_file_imports(source_file) {
+    const import_declarations = _get_nested_children(source_file, ts.SyntaxKind.ImportDeclaration);
+    const imports = {};
+    for (const import_declaration of import_declarations) {
+        const import_attributes = _resolve_import(import_declaration);
+        imports[import_attributes.module] = import_attributes;
+    }
+    if (Object.keys(imports).length < 1) {
+        return undefined;
+    }
+    return imports;
+}
+function _resolve_import(import_declaration) {
+    const text = import_declaration.getText();
+    const module = import_declaration.moduleSpecifier
+        .getText()
+        .replaceAll("'", '')
+        .replaceAll('"', '');
+    // i.e.: import * as plutonio from 'plutonio'
+    const namespace_imports = utils.get_nested_of_type(import_declaration, ts.SyntaxKind.NamespaceImport);
+    if (namespace_imports.length > 0 && namespace_imports[0]) {
+        const namespace_import = namespace_imports[0];
+        const identifiers = utils.get_nested_of_type(namespace_import, ts.SyntaxKind.Identifier);
+        const identifier = identifiers[0];
+        if (!identifier) {
+            throw new Error(`Missing identifier in namespace import`);
+        }
+        const clause = identifier.getText();
+        return {
+            text,
+            module,
+            clause,
+            specifiers: [],
+        };
+    }
+    // i.e.: import {atom} from 'plutonio'
+    const import_specifiers = utils.get_nested_of_type(import_declaration, ts.SyntaxKind.ImportSpecifier);
+    if (import_specifiers.length > 0) {
+        const specifiers = import_specifiers.map((is) => is.getText());
+        return {
+            text,
+            module,
+            clause: '',
+            specifiers,
+        };
+    }
+    // i.e.: import plutonio from 'plutonio'
+    const import_clauses = utils.get_nested_of_type(import_declaration, ts.SyntaxKind.ImportClause);
+    const import_clause = import_clauses[0];
+    if (!import_clause) {
+        throw new Error(`Missing import clause`);
+    }
+    const clause = import_clause.getText();
+    return {
+        text,
+        module,
+        clause,
+        specifiers: [],
+    };
+}
+function _resolve_source_file_part(source_file, syntax_kind) {
+    const nodes = _get_nested_children(source_file, syntax_kind);
+    const scanned_nodes = {};
+    for (const node of nodes) {
+        const name = _get_name(node);
+        scanned_nodes[name] = _resolve_node(node, name);
+    }
+    if (Object.keys(scanned_nodes).length < 1) {
+        return undefined;
+    }
+    return scanned_nodes;
 }
 function _resolve_node(node, name) {
     const type_attributes = _resolve_type_attributes(node);
@@ -67,6 +131,9 @@ function _resolve_kind(node) {
     if (ts.isInterfaceDeclaration(node)) {
         return t.KIND.INTERFACE;
     }
+    if (ts.isEnumDeclaration(node)) {
+        return t.KIND.ENUM;
+    }
     throw new Error(`Cannot resolve KIND`);
 }
 function _resolve_type_attributes(node) {
@@ -80,10 +147,70 @@ function _resolve_type_attributes(node) {
         properties: _resolve_properties(node),
         item: _resolve_item(node),
         original: _resolve_original(node),
-        // enum: _resolve_enum(),
-        // properties: undefined,
+        values: _resolve_values(node),
     };
     return utils.no_undefined(type_attributes);
+}
+function _resolve_values(node) {
+    const enum_members = _get_nested_children(node, ts.SyntaxKind.EnumMember);
+    if (Array.isArray(enum_members) && enum_members.length > 0) {
+        return _resolve_values_from_enum_members(enum_members);
+    }
+    const union_type = _get_first_level_child(node, ts.SyntaxKind.UnionType);
+    if (union_type) {
+        return _resolve_values_from_union_type(node);
+    }
+    return _resolve_values_from_keyof_keyword(node);
+}
+function _resolve_values_from_enum_members(enum_members) {
+    const values = [];
+    for (const enum_member of enum_members) {
+        const type = checker.getTypeAtLocation(enum_member);
+        // TODO: fix any
+        const value = type.value;
+        if (typeof value !== undefined) {
+            const final_value = typeof value === 'number' ? value : String(value);
+            values.push(final_value);
+        }
+    }
+    return values;
+}
+function _resolve_values_from_union_type(node) {
+    const union_type = _get_first_level_child(node, ts.SyntaxKind.UnionType);
+    if (!union_type) {
+        return undefined;
+    }
+    const type = checker.getTypeAtLocation(node);
+    return _get_values_from_union_type(type);
+}
+function _get_values_from_union_type(type) {
+    const values = [];
+    for (const keytype of type.types) {
+        // TODO: fix any
+        const value = keytype.value;
+        if (typeof value !== undefined) {
+            const final_value = typeof value === 'number' ? value : String(value);
+            if (value) {
+                values.push(final_value);
+            }
+        }
+    }
+    if (values.length > 0) {
+        return values;
+    }
+    return undefined;
+}
+function _resolve_values_from_keyof_keyword(node) {
+    const type_operator = _get_first_level_child(node, ts.SyntaxKind.TypeOperator);
+    if (!type_operator) {
+        return undefined;
+    }
+    const keyof_keyword = _get_first_level_child(type_operator, ts.SyntaxKind.KeyOfKeyword);
+    if (!keyof_keyword) {
+        return undefined;
+    }
+    const type = checker.getTypeAtLocation(node);
+    return _get_values_from_union_type(type);
 }
 function _resolve_original(node) {
     return node.getText();
@@ -139,6 +266,37 @@ function _get_type_first_identifier_name(node) {
     const name = identifier.escapedText;
     return name || undefined;
 }
+function _node_type_is_enum(node) {
+    if (ts.isEnumDeclaration(node)) {
+        return true;
+    }
+    const type_operator = _get_first_level_child(node, ts.SyntaxKind.TypeOperator);
+    if (type_operator) {
+        const keyof_keyword = _get_first_level_child(type_operator, ts.SyntaxKind.KeyOfKeyword);
+        if (keyof_keyword) {
+            return true;
+        }
+    }
+    const union_type = _get_first_level_child(node, ts.SyntaxKind.UnionType);
+    if (union_type) {
+        return _is_union_type_an_enum(union_type);
+    }
+    return false;
+}
+function _is_union_type_an_enum(node) {
+    const children = node.getChildren();
+    for (let i = 0; i < children.length; i++) {
+        const child = children[i];
+        if (!child) {
+            continue;
+        }
+        if (child.kind !== ts.SyntaxKind.LiteralType &&
+            child.kind !== ts.SyntaxKind.BarToken) {
+            return false;
+        }
+    }
+    return true;
+}
 function _node_type_is_array(node) {
     if (_has_first_level_child(node, ts.SyntaxKind.ArrayType)) {
         return true;
@@ -188,7 +346,7 @@ function _resolve_property(property) {
         item: _resolve_item(property),
         original: _resolve_original(property),
         primitive: _resolve_primitive(property),
-        // enum: _resolve_enum(property),
+        values: _resolve_values(property),
         properties: _resolve_properties(property),
     };
     return utils.no_undefined(type_attribute);
@@ -232,6 +390,9 @@ function _unknown_type_reference(_node) {
 //   return type_attributes.primitive;
 // }
 function _resolve_primitive(node) {
+    if (_node_type_is_enum(node)) {
+        return t.PRIMITIVE.ENUM;
+    }
     if (_node_type_is_array(node)) {
         return t.PRIMITIVE.ARRAY;
     }
@@ -261,6 +422,13 @@ function _resolve_primitive(node) {
 function _node_type_is_object(node) {
     if (_has_first_level_child(node, ts.SyntaxKind.TypeLiteral)) {
         return true;
+    }
+    const type_reference = _get_first_level_child(node, ts.SyntaxKind.TypeReference);
+    if (type_reference) {
+        const identifier_name = _get_type_first_identifier_name(type_reference);
+        if (identifier_name === 'Record') {
+            return true;
+        }
     }
     return false;
 }

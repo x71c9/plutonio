@@ -6,11 +6,14 @@
  */
 
 export type Scanned = {
-  [source_file_path: string]: {
-    imports: Imports;
-    types: Types;
-    interfaces: Interfaces;
-  };
+  [source_file_path: string]: SourceFile;
+};
+
+export type SourceFile = {
+  imports?: Imports;
+  types?: Types;
+  interfaces?: Interfaces;
+  enums?: Enums;
 };
 
 export type Imports = {
@@ -32,9 +35,14 @@ export type Interfaces = {
   [name: string]: Interace;
 };
 
+export type Enums = {
+  [name: string]: Enum;
+};
+
 export const KIND = {
   TYPE: 'type',
   INTERFACE: 'interface',
+  ENUM: 'enum',
 } as const;
 
 export type Kind = ObjectValue<typeof KIND>;
@@ -45,6 +53,8 @@ export type CommonAttributes = TypeAttributes & {
 };
 
 export type Type = CommonAttributes;
+
+export type Enum = CommonAttributes;
 
 export type Interace = CommonAttributes & {
   extends?: Extend[];
@@ -61,12 +71,13 @@ export type TypeAttributes = {
   original: string;
   primitive: Primitive;
   item?: TypeAttributes;
-  enum?: Enum[];
+  values?: Values;
   properties?: Properties;
 };
 
 export const PRIMITIVE = {
   ARRAY: 'array',
+  ENUM: 'enum',
   BOOLEAN: 'boolean',
   NUMBER: 'number',
   STRING: 'string',
@@ -79,10 +90,6 @@ export const PRIMITIVE = {
 
 export type Primitive = ObjectValue<typeof PRIMITIVE>;
 
-export type Enum =
-  | string[]
-  | number[]
-  | [true, false]
-  | (string | number | boolean)[];
+export type Values = (string | number)[];
 
 type ObjectValue<T> = T[keyof T];

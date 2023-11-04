@@ -7,9 +7,11 @@
 export const KIND = {
     TYPE: 'type',
     INTERFACE: 'interface',
+    ENUM: 'enum',
 };
 export const PRIMITIVE = {
     ARRAY: 'array',
+    ENUM: 'enum',
     BOOLEAN: 'boolean',
     NUMBER: 'number',
     STRING: 'string',

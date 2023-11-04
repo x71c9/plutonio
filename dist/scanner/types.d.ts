@@ -5,11 +5,13 @@
  * @packageDocumentation
  */
 export type Scanned = {
-    [source_file_path: string]: {
-        imports: Imports;
-        types: Types;
-        interfaces: Interfaces;
-    };
+    [source_file_path: string]: SourceFile;
+};
+export type SourceFile = {
+    imports?: Imports;
+    types?: Types;
+    interfaces?: Interfaces;
+    enums?: Enums;
 };
 export type Imports = {
     [module: string]: Import;
@@ -26,9 +28,13 @@ export type Types = {
 export type Interfaces = {
     [name: string]: Interace;
 };
+export type Enums = {
+    [name: string]: Enum;
+};
 export declare const KIND: {
     readonly TYPE: "type";
     readonly INTERFACE: "interface";
+    readonly ENUM: "enum";
 };
 export type Kind = ObjectValue<typeof KIND>;
 export type CommonAttributes = TypeAttributes & {
@@ -36,6 +42,7 @@ export type CommonAttributes = TypeAttributes & {
     kind: Kind;
 };
 export type Type = CommonAttributes;
+export type Enum = CommonAttributes;
 export type Interace = CommonAttributes & {
     extends?: Extend[];
 };
@@ -47,11 +54,12 @@ export type TypeAttributes = {
     original: string;
     primitive: Primitive;
     item?: TypeAttributes;
-    enum?: Enum[];
+    values?: Values;
     properties?: Properties;
 };
 export declare const PRIMITIVE: {
     ARRAY: string;
+    ENUM: string;
     BOOLEAN: string;
     NUMBER: string;
     STRING: string;
@@ -62,6 +70,6 @@ export declare const PRIMITIVE: {
     UNDEFINED: string;
 };
 export type Primitive = ObjectValue<typeof PRIMITIVE>;
-export type Enum = string[] | number[] | [true, false] | (string | number | boolean)[];
+export type Values = (string | number)[];
 type ObjectValue<T> = T[keyof T];
 export {};
