@@ -1,6 +1,6 @@
 {
   "name": "plutonio",
-  "version": "1.1.1",
+  "version": "0.0.0",
   "description": "A typescript library that scans your typescript project and generate a schema of all types and interfaces of the project.",
   "main": "dist/index.js",
   "repository": "git@github.com:x71c9/plutonio.git",
