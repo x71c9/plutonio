@@ -12,7 +12,7 @@ import * as t from './types.js';
 const known_type_reference = ['Array', 'Record'];
 let checker;
 export function scanner() {
-    const tsconfig_path = `/Users/x71c9/repos/plutonio/builder/tsconfig.json`;
+    const tsconfig_path = `/home/x71c9/repos/plutonio/builder/tsconfig.json`;
     const config_file = ts.readConfigFile(tsconfig_path, ts.sys.readFile);
     const config_object = config_file.config;
     const parse_result = ts.parseJsonConfigFileContent(config_object, ts.sys, path.dirname(tsconfig_path));
@@ -185,6 +185,10 @@ function _resolve_values_from_union_type(node) {
 }
 function _get_values_from_union_type(type) {
     const values = [];
+    if (!type.types) {
+        // TODO: fix any
+        return [type.value];
+    }
     for (const keytype of type.types) {
         // TODO: fix any
         const value = keytype.value;

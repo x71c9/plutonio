@@ -16,7 +16,7 @@ const known_type_reference = ['Array', 'Record'];
 let checker: ts.TypeChecker;
 
 export function scanner() {
-  const tsconfig_path = `/Users/x71c9/repos/plutonio/builder/tsconfig.json`;
+  const tsconfig_path = `/home/x71c9/repos/plutonio/builder/tsconfig.json`;
   const config_file = ts.readConfigFile(tsconfig_path, ts.sys.readFile);
   const config_object = config_file.config;
   const parse_result = ts.parseJsonConfigFileContent(
@@ -238,6 +238,10 @@ function _resolve_values_from_union_type(node: ts.Node): t.Values | undefined {
 
 function _get_values_from_union_type(type: ts.UnionType): t.Values | undefined {
   const values: (string | number)[] = [];
+  if (!type.types) {
+    // TODO: fix any
+    return [(type as any).value];
+  }
   for (const keytype of type.types) {
     // TODO: fix any
     const value = (keytype as any).value;
