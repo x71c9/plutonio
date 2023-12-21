@@ -7,8 +7,8 @@
  */
 
 import path from 'path';
-import * as utils from '../utils/index.js';
 import ts from 'typescript';
+import * as utils from '../utils/index.js';
 import * as t from './types.js';
 
 const known_type_reference = ['Array', 'Record'];

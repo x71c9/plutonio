@@ -46,6 +46,7 @@
     "tsc-watch": "^6.0.0"
   },
   "dependencies": {
-    "i0n": "^0.6.0"
+    "i0n": "^0.6.0",
+    "typescript": "^5.3.3"
   }
 }
