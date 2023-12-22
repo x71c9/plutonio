@@ -7,7 +7,6 @@
   "author": "x71c9 <108585118+x71c9@users.noreply.github.com>",
   "license": "UNLICENSED",
   "private": false,
-  "type": "module",
   "scripts": {
     "precommit": "yarn lint-staged --allow-empty",
     "prepare": "yarn husky install .repo/husky && yarn husky set .repo/husky/pre-commit \"yarn precommit\"",
