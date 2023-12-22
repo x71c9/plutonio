@@ -1,3 +1,4 @@
+"use strict";
 /**
  *
  * Log module
@@ -5,6 +6,11 @@
  * @packageDocumentation
  *
  */
-import i0n from 'i0n';
-export const ion = i0n.create({});
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.ion = void 0;
+const i0n_1 = __importDefault(require("i0n"));
+exports.ion = i0n_1.default.create({});
 //# sourceMappingURL=index.js.map

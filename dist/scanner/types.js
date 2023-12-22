@@ -1,15 +1,18 @@
+"use strict";
 /**
  *
  * Types index module
  *
  * @packageDocumentation
  */
-export const KIND = {
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.PRIMITIVE = exports.KIND = void 0;
+exports.KIND = {
     TYPE: 'type',
     INTERFACE: 'interface',
     ENUM: 'enum',
 };
-export const PRIMITIVE = {
+exports.PRIMITIVE = {
     ARRAY: 'array',
     ENUM: 'enum',
     BOOLEAN: 'boolean',
