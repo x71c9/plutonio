@@ -40,8 +40,7 @@ const utils = __importStar(require("../utils/index.js"));
 const t = __importStar(require("./types.js"));
 const known_type_reference = ['Array', 'Record'];
 let checker;
-function scanner() {
-    const tsconfig_path = `/home/x71c9/repos/plutonio/builder/tsconfig.json`;
+function scanner(tsconfig_path) {
     const config_file = typescript_1.default.readConfigFile(tsconfig_path, typescript_1.default.sys.readFile);
     const config_object = config_file.config;
     const parse_result = typescript_1.default.parseJsonConfigFileContent(config_object, typescript_1.default.sys, path_1.default.dirname(tsconfig_path));

@@ -15,8 +15,7 @@ const known_type_reference = ['Array', 'Record'];
 
 let checker: ts.TypeChecker;
 
-export function scanner() {
-  const tsconfig_path = `/home/x71c9/repos/plutonio/builder/tsconfig.json`;
+export function scanner(tsconfig_path: string) {
   const config_file = ts.readConfigFile(tsconfig_path, ts.sys.readFile);
   const config_object = config_file.config;
   const parse_result = ts.parseJsonConfigFileContent(
