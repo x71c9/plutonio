@@ -44,9 +44,8 @@ export type CommonAttributes = TypeAttributes & {
 export type Type = CommonAttributes;
 export type Enum = CommonAttributes;
 export type Interace = CommonAttributes & {
-    extends?: Extend[];
+    extends?: string[];
 };
-export type Extend = {};
 export type Properties = {
     [k: string]: TypeAttributes;
 };

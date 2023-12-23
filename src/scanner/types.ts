@@ -57,11 +57,11 @@ export type Type = CommonAttributes;
 export type Enum = CommonAttributes;
 
 export type Interace = CommonAttributes & {
-  extends?: Extend[];
+  extends?: string[];
 };
 
 // TODO
-export type Extend = {};
+// export type Extend = {};
 
 export type Properties = {
   [k: string]: TypeAttributes;

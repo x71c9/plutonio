@@ -163,6 +163,7 @@ function _resolve_node(node: ts.Node, name: string): t.Type | t.Interace {
   const scanned_type: t.Type | t.Interace | t.Enums = {
     name,
     kind: _resolve_kind(node),
+    extends: _resolve_extends(node),
     ...type_attributes,
   };
   return utils.no_undefined(scanned_type);
@@ -195,6 +196,31 @@ function _resolve_type_attributes(node: ts.Node): t.TypeAttributes {
     values: _resolve_values(node),
   };
   return utils.no_undefined(type_attributes);
+}
+
+function _resolve_extends(node: ts.Node): string[] | undefined {
+  const syntax_lists = _get_first_level_children(
+    node,
+    ts.SyntaxKind.SyntaxList
+  );
+  for (const syntax_list of syntax_lists) {
+    const heritage_clause = _get_first_level_child(
+      syntax_list,
+      ts.SyntaxKind.HeritageClause
+    );
+    if (heritage_clause) {
+      const heritage_syntax_list = _get_first_level_child(
+        heritage_clause,
+        ts.SyntaxKind.SyntaxList
+      );
+      if (heritage_syntax_list) {
+        const extend_string = heritage_syntax_list.getFullText().trim();
+        const exts = extend_string.split(',');
+        return exts.map((e) => e.trim());
+      }
+    }
+  }
+  return undefined;
 }
 
 function _resolve_values(node: ts.Node): t.Values | undefined {
@@ -424,23 +450,8 @@ function _resolve_properties(node: ts.Node): t.Properties | undefined {
   if (_is_intersection(node)) {
     return _resolve_intersection_properties(node);
   }
-  let properties: t.Properties | undefined;
-  const type_literal = _get_first_level_child(node, ts.SyntaxKind.TypeLiteral);
-  if (!type_literal) {
-    return properties;
-  }
-  const syntax_list = _get_first_level_child(
-    type_literal,
-    ts.SyntaxKind.SyntaxList
-  );
-  if (!syntax_list) {
-    return properties;
-  }
-  properties = {};
-  const property_signatures = _get_first_level_children(
-    syntax_list,
-    ts.SyntaxKind.PropertySignature
-  ) as ts.PropertySignature[];
+  const properties: t.Properties = {};
+  const property_signatures = _get_property_signatures(node);
   for (const property_signature of property_signatures) {
     const property_name = _get_name(property_signature);
     if (_is_node_custom_type_reference(property_signature)) {
@@ -453,6 +464,39 @@ function _resolve_properties(node: ts.Node): t.Properties | undefined {
     properties[property_name] = _resolve_property(property_signature);
   }
   return properties;
+}
+
+function _get_property_signatures(node: ts.Node): ts.PropertySignature[] {
+  const type_literal = _get_first_level_child(node, ts.SyntaxKind.TypeLiteral);
+  // Type Literal
+  if (type_literal) {
+    const syntax_list = _get_first_level_child(
+      type_literal,
+      ts.SyntaxKind.SyntaxList
+    );
+    if (syntax_list) {
+      const property_signatures = _get_first_level_children(
+        syntax_list,
+        ts.SyntaxKind.PropertySignature
+      ) as ts.PropertySignature[];
+      return property_signatures;
+    }
+  }
+  // Interface
+  const syntax_lists = _get_first_level_children(
+    node,
+    ts.SyntaxKind.SyntaxList
+  );
+  for (const syntax_list of syntax_lists) {
+    const property_signatures = _get_first_level_children(
+      syntax_list,
+      ts.SyntaxKind.PropertySignature
+    ) as ts.PropertySignature[];
+    if (property_signatures.length > 0) {
+      return property_signatures;
+    }
+  }
+  return [];
 }
 
 // function _is_custom_type_reference(type_reference: ts.TypeReference): boolean {
@@ -520,6 +564,9 @@ function _unknown_type_reference(_node: ts.Node): t.TypeAttributes {
 // }
 
 function _resolve_primitive(node: ts.Node): t.Primitive {
+  if (ts.isInterfaceDeclaration(node)) {
+    return t.PRIMITIVE.OBJECT;
+  }
   if (_is_intersection(node)) {
     return _resolve_intersection_primitive(node);
   }

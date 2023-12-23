@@ -149,6 +149,7 @@ function _resolve_node(node, name) {
     const scanned_type = {
         name,
         kind: _resolve_kind(node),
+        extends: _resolve_extends(node),
         ...type_attributes,
     };
     return utils.no_undefined(scanned_type);
@@ -179,6 +180,21 @@ function _resolve_type_attributes(node) {
         values: _resolve_values(node),
     };
     return utils.no_undefined(type_attributes);
+}
+function _resolve_extends(node) {
+    const syntax_lists = _get_first_level_children(node, typescript_1.default.SyntaxKind.SyntaxList);
+    for (const syntax_list of syntax_lists) {
+        const heritage_clause = _get_first_level_child(syntax_list, typescript_1.default.SyntaxKind.HeritageClause);
+        if (heritage_clause) {
+            const heritage_syntax_list = _get_first_level_child(heritage_clause, typescript_1.default.SyntaxKind.SyntaxList);
+            if (heritage_syntax_list) {
+                const extend_string = heritage_syntax_list.getFullText().trim();
+                const exts = extend_string.split(',');
+                return exts.map(e => e.trim());
+            }
+        }
+    }
+    return undefined;
 }
 function _resolve_values(node) {
     const enum_members = _get_nested_children(node, typescript_1.default.SyntaxKind.EnumMember);
@@ -352,17 +368,8 @@ function _resolve_properties(node) {
     if (_is_intersection(node)) {
         return _resolve_intersection_properties(node);
     }
-    let properties;
-    const type_literal = _get_first_level_child(node, typescript_1.default.SyntaxKind.TypeLiteral);
-    if (!type_literal) {
-        return properties;
-    }
-    const syntax_list = _get_first_level_child(type_literal, typescript_1.default.SyntaxKind.SyntaxList);
-    if (!syntax_list) {
-        return properties;
-    }
-    properties = {};
-    const property_signatures = _get_first_level_children(syntax_list, typescript_1.default.SyntaxKind.PropertySignature);
+    const properties = {};
+    const property_signatures = _get_property_signatures(node);
     for (const property_signature of property_signatures) {
         const property_name = _get_name(property_signature);
         if (_is_node_custom_type_reference(property_signature)) {
@@ -374,6 +381,26 @@ function _resolve_properties(node) {
         properties[property_name] = _resolve_property(property_signature);
     }
     return properties;
+}
+function _get_property_signatures(node) {
+    const type_literal = _get_first_level_child(node, typescript_1.default.SyntaxKind.TypeLiteral);
+    // Type Literal
+    if (type_literal) {
+        const syntax_list = _get_first_level_child(type_literal, typescript_1.default.SyntaxKind.SyntaxList);
+        if (syntax_list) {
+            const property_signatures = _get_first_level_children(syntax_list, typescript_1.default.SyntaxKind.PropertySignature);
+            return property_signatures;
+        }
+    }
+    // Interface
+    const syntax_lists = _get_first_level_children(node, typescript_1.default.SyntaxKind.SyntaxList);
+    for (const syntax_list of syntax_lists) {
+        const property_signatures = _get_first_level_children(syntax_list, typescript_1.default.SyntaxKind.PropertySignature);
+        if (property_signatures.length > 0) {
+            return property_signatures;
+        }
+    }
+    return [];
 }
 // function _is_custom_type_reference(type_reference: ts.TypeReference): boolean {
 // }
@@ -426,6 +453,9 @@ function _unknown_type_reference(_node) {
 //   return type_attributes.primitive;
 // }
 function _resolve_primitive(node) {
+    if (typescript_1.default.isInterfaceDeclaration(node)) {
+        return t.PRIMITIVE.OBJECT;
+    }
     if (_is_intersection(node)) {
         return _resolve_intersection_primitive(node);
     }
