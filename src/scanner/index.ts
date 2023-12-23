@@ -57,8 +57,14 @@ export function scanner(tsconfig_path: string) {
     };
     scanned[source_file.fileName] = utils.no_undefined(scanned_source_file);
   }
+  // _resolve_interface_extends(scanned);
   return scanned;
 }
+
+// function _resolve_interface_extends(scanned:t.Scanned){
+//   for(const [source_path, source_scanned] of Object.entries(scanned)){
+//   }
+// }
 
 function _resolve_source_file_imports(
   source_file: ts.SourceFile
@@ -188,14 +194,85 @@ function _resolve_type_attributes(node: ts.Node): t.TypeAttributes {
     type_attributes.original = _resolve_original(node);
     return type_attributes;
   }
-  const type_attributes: t.TypeAttributes = {
+  let type_attributes: t.TypeAttributes = {
     primitive: _resolve_primitive(node),
     properties: _resolve_properties(node),
     item: _resolve_item(node),
     original: _resolve_original(node),
     values: _resolve_values(node),
   };
+  if (ts.isInterfaceDeclaration(node)) {
+    const extended_type_attributes = _resolve_extended_type_attributes(node);
+    type_attributes = _merge_type_attributes(
+      type_attributes,
+      ...extended_type_attributes
+    );
+  }
   return utils.no_undefined(type_attributes);
+}
+
+function _merge_type_attributes(
+  ...type_attributes: t.TypeAttributes[]
+): t.TypeAttributes {
+  const main_type_attributues = type_attributes[0];
+  if (!main_type_attributues?.properties) {
+    return main_type_attributues as t.TypeAttributes;
+  }
+  for (let i = 1; i < type_attributes.length; i++) {
+    const current_type_attributes = type_attributes[i];
+    if (!current_type_attributes?.properties) {
+      continue;
+    }
+    for (const [key, value] of Object.entries(
+      current_type_attributes?.properties
+    )) {
+      if (key in main_type_attributues?.properties) {
+        continue;
+      }
+      main_type_attributues.properties[key] = value;
+    }
+  }
+  return main_type_attributues;
+}
+
+function _resolve_extended_type_attributes(node: ts.Node): t.TypeAttributes[] {
+  const syntax_lists = _get_first_level_children(
+    node,
+    ts.SyntaxKind.SyntaxList
+  );
+  const type_attributes: t.TypeAttributes[] = [];
+  for (const syntax_list of syntax_lists) {
+    const heritage_clause = _get_first_level_child(
+      syntax_list,
+      ts.SyntaxKind.HeritageClause
+    );
+    if (heritage_clause) {
+      const heritage_syntax_list = _get_first_level_child(
+        heritage_clause,
+        ts.SyntaxKind.SyntaxList
+      );
+      if (heritage_syntax_list) {
+        const exp_with_type_args = _get_first_level_children(
+          heritage_syntax_list,
+          ts.SyntaxKind.ExpressionWithTypeArguments
+        );
+        for (const exp of exp_with_type_args) {
+          const exp_type = checker.getTypeAtLocation(exp);
+          let declaration: ts.Declaration | undefined;
+          if (exp_type.aliasSymbol) {
+            declaration = exp_type.aliasSymbol?.declarations?.[0];
+          } else if (exp_type.symbol) {
+            declaration = exp_type.symbol?.declarations?.[0];
+          }
+          if (declaration) {
+            const resolved = _resolve_type_attributes(declaration);
+            type_attributes.push(resolved);
+          }
+        }
+      }
+    }
+  }
+  return type_attributes;
 }
 
 function _resolve_extends(node: ts.Node): string[] | undefined {

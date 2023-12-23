@@ -69,9 +69,14 @@ function scanner(tsconfig_path) {
         };
         scanned[source_file.fileName] = utils.no_undefined(scanned_source_file);
     }
+    // _resolve_interface_extends(scanned);
     return scanned;
 }
 exports.scanner = scanner;
+// function _resolve_interface_extends(scanned:t.Scanned){
+//   for(const [source_path, source_scanned] of Object.entries(scanned)){
+//   }
+// }
 function _resolve_source_file_imports(source_file) {
     const import_declarations = _get_nested_children(source_file, typescript_1.default.SyntaxKind.ImportDeclaration);
     const imports = {};
@@ -172,14 +177,66 @@ function _resolve_type_attributes(node) {
         type_attributes.original = _resolve_original(node);
         return type_attributes;
     }
-    const type_attributes = {
+    let type_attributes = {
         primitive: _resolve_primitive(node),
         properties: _resolve_properties(node),
         item: _resolve_item(node),
         original: _resolve_original(node),
         values: _resolve_values(node),
     };
+    if (typescript_1.default.isInterfaceDeclaration(node)) {
+        const extended_type_attributes = _resolve_extended_type_attributes(node);
+        type_attributes = _merge_type_attributes(type_attributes, ...extended_type_attributes);
+    }
     return utils.no_undefined(type_attributes);
+}
+function _merge_type_attributes(...type_attributes) {
+    const main_type_attributues = type_attributes[0];
+    if (!(main_type_attributues === null || main_type_attributues === void 0 ? void 0 : main_type_attributues.properties)) {
+        return main_type_attributues;
+    }
+    for (let i = 1; i < type_attributes.length; i++) {
+        const current_type_attributes = type_attributes[i];
+        if (!(current_type_attributes === null || current_type_attributes === void 0 ? void 0 : current_type_attributes.properties)) {
+            continue;
+        }
+        for (const [key, value] of Object.entries(current_type_attributes === null || current_type_attributes === void 0 ? void 0 : current_type_attributes.properties)) {
+            if (key in (main_type_attributues === null || main_type_attributues === void 0 ? void 0 : main_type_attributues.properties)) {
+                continue;
+            }
+            main_type_attributues.properties[key] = value;
+        }
+    }
+    return main_type_attributues;
+}
+function _resolve_extended_type_attributes(node) {
+    var _a, _b, _c, _d;
+    const syntax_lists = _get_first_level_children(node, typescript_1.default.SyntaxKind.SyntaxList);
+    const type_attributes = [];
+    for (const syntax_list of syntax_lists) {
+        const heritage_clause = _get_first_level_child(syntax_list, typescript_1.default.SyntaxKind.HeritageClause);
+        if (heritage_clause) {
+            const heritage_syntax_list = _get_first_level_child(heritage_clause, typescript_1.default.SyntaxKind.SyntaxList);
+            if (heritage_syntax_list) {
+                const exp_with_type_args = _get_first_level_children(heritage_syntax_list, typescript_1.default.SyntaxKind.ExpressionWithTypeArguments);
+                for (const exp of exp_with_type_args) {
+                    const exp_type = checker.getTypeAtLocation(exp);
+                    let declaration;
+                    if (exp_type.aliasSymbol) {
+                        declaration = (_b = (_a = exp_type.aliasSymbol) === null || _a === void 0 ? void 0 : _a.declarations) === null || _b === void 0 ? void 0 : _b[0];
+                    }
+                    else if (exp_type.symbol) {
+                        declaration = (_d = (_c = exp_type.symbol) === null || _c === void 0 ? void 0 : _c.declarations) === null || _d === void 0 ? void 0 : _d[0];
+                    }
+                    if (declaration) {
+                        const resolved = _resolve_type_attributes(declaration);
+                        type_attributes.push(resolved);
+                    }
+                }
+            }
+        }
+    }
+    return type_attributes;
 }
 function _resolve_extends(node) {
     const syntax_lists = _get_first_level_children(node, typescript_1.default.SyntaxKind.SyntaxList);
