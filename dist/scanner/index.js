@@ -190,7 +190,7 @@ function _resolve_extends(node) {
             if (heritage_syntax_list) {
                 const extend_string = heritage_syntax_list.getFullText().trim();
                 const exts = extend_string.split(',');
-                return exts.map(e => e.trim());
+                return exts.map((e) => e.trim());
             }
         }
     }
