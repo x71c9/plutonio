@@ -425,15 +425,21 @@ function _resolve_properties(node) {
     if (_is_intersection(node)) {
         return _resolve_intersection_properties(node);
     }
-    const properties = {};
+    let properties;
     const property_signatures = _get_property_signatures(node);
     for (const property_signature of property_signatures) {
         const property_name = _get_name(property_signature);
         if (_is_node_custom_type_reference(property_signature)) {
             const property_attributes = _resolve_type_attributes_for_type_reference(property_signature);
             property_attributes.original = _resolve_original(property_signature);
+            if (!properties) {
+                properties = {};
+            }
             properties[property_name] = property_attributes;
             continue;
+        }
+        if (!properties) {
+            properties = {};
         }
         properties[property_name] = _resolve_property(property_signature);
     }
