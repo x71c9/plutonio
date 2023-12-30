@@ -26,7 +26,7 @@ export type Types = {
     [name: string]: Type;
 };
 export type Interfaces = {
-    [name: string]: Interace;
+    [name: string]: Interface;
 };
 export type Enums = {
     [name: string]: Enum;
@@ -43,7 +43,7 @@ export type CommonAttributes = TypeAttributes & {
 };
 export type Type = CommonAttributes;
 export type Enum = CommonAttributes;
-export type Interace = CommonAttributes & {
+export type Interface = CommonAttributes & {
     extends?: string[];
 };
 export type Properties = {

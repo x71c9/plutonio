@@ -32,7 +32,7 @@ export type Types = {
 };
 
 export type Interfaces = {
-  [name: string]: Interace;
+  [name: string]: Interface;
 };
 
 export type Enums = {
@@ -56,7 +56,7 @@ export type Type = CommonAttributes;
 
 export type Enum = CommonAttributes;
 
-export type Interace = CommonAttributes & {
+export type Interface = CommonAttributes & {
   extends?: string[];
 };
 

@@ -165,9 +165,9 @@ function _resolve_source_file_part(
   return scanned_nodes;
 }
 
-function _resolve_node(node: ts.Node, name: string): t.Type | t.Interace {
+function _resolve_node(node: ts.Node, name: string): t.Type | t.Interface {
   const type_attributes = _resolve_type_attributes(node);
-  const scanned_type: t.Type | t.Interace | t.Enums = {
+  const scanned_type: t.Type | t.Interface | t.Enums = {
     name,
     kind: _resolve_kind(node),
     extends: _resolve_extends(node),
