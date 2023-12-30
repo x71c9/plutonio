@@ -28,7 +28,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const plutonio = __importStar(require("./main.js"));
+const plutonio = __importStar(require("./main"));
 exports.default = plutonio;
 // const scanned = plutonio.scanner();
 // console.log(JSON.stringify(scanned, null, 2));

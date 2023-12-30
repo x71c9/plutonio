@@ -29,6 +29,9 @@ var __importStar = (this && this.__importStar) || function (mod) {
     __setModuleDefault(result, mod);
     return result;
 };
+var __exportStar = (this && this.__exportStar) || function(m, exports) {
+    for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -36,8 +39,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.scanner = void 0;
 const path_1 = __importDefault(require("path"));
 const typescript_1 = __importDefault(require("typescript"));
-const utils = __importStar(require("../utils/index.js"));
-const t = __importStar(require("./types.js"));
+const utils = __importStar(require("../utils/index"));
+const t = __importStar(require("./types"));
+__exportStar(require("./types"), exports);
 const known_type_reference = ['Array', 'Record'];
 let checker;
 function scanner(tsconfig_path) {

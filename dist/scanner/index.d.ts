@@ -5,5 +5,6 @@
  * @packageDocumentation
  *
  */
-import * as t from './types.js';
+import * as t from './types';
+export * from './types';
 export declare function scanner(tsconfig_path: string): t.Scanned;
