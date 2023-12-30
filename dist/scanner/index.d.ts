@@ -7,4 +7,4 @@
  */
 import * as t from './types';
 export * from './types';
-export declare function scanner(tsconfig_path: string): t.Scanned;
+export declare function scan(tsconfig_path: string): t.Scanned;

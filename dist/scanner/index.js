@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.scanner = void 0;
+exports.scan = void 0;
 const path_1 = __importDefault(require("path"));
 const typescript_1 = __importDefault(require("typescript"));
 const utils = __importStar(require("../utils/index"));
@@ -44,7 +44,7 @@ const t = __importStar(require("./types"));
 __exportStar(require("./types"), exports);
 const known_type_reference = ['Array', 'Record'];
 let checker;
-function scanner(tsconfig_path) {
+function scan(tsconfig_path) {
     const config_file = typescript_1.default.readConfigFile(tsconfig_path, typescript_1.default.sys.readFile);
     const config_object = config_file.config;
     const parse_result = typescript_1.default.parseJsonConfigFileContent(config_object, typescript_1.default.sys, path_1.default.dirname(tsconfig_path));
@@ -76,7 +76,7 @@ function scanner(tsconfig_path) {
     // _resolve_interface_extends(scanned);
     return scanned;
 }
-exports.scanner = scanner;
+exports.scan = scan;
 // function _resolve_interface_extends(scanned:t.Scanned){
 //   for(const [source_path, source_scanned] of Object.entries(scanned)){
 //   }
