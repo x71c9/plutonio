@@ -65,6 +65,9 @@ function scan(tsconfig_path) {
         if (source_file.isDeclarationFile) {
             continue;
         }
+        if (source_file.fileName.indexOf(compilerOptions.baseUrl || '') === -1) {
+            continue;
+        }
         const scanned_source_file = {
             imports: _resolve_source_file_imports(source_file),
             types: _resolve_source_file_part(source_file, typescript_1.default.SyntaxKind.TypeAliasDeclaration),
@@ -488,6 +491,31 @@ function _resolve_type_attributes_for_type_reference(node) {
         return _unknown_type_reference(node);
     }
     const node_type = checker.getTypeAtLocation(type_reference);
+    /*
+     * I added this for avoiding infinite loop when defining ENUM as ObjectValue
+     * of a constant. e.g.:
+     *
+     * type ObjectValue<T> = T[keyof T];
+     * const VIDEO_CATEGORY = {
+     *   STACK_EXCHANGE: 'stackexchange',
+     *   TIMER: 'timer',
+     * } as const;
+     * type VideoCategory = ObjectValue<typeof VIDEO_CATEGORY>;
+     *
+     * VideoCategory in this case is a Union:
+     */
+    if (node_type.isUnion()) {
+        const values = [];
+        for (let single_type of node_type.types) {
+            values.push(single_type.value);
+        }
+        let type_attributes = {
+            primitive: t.PRIMITIVE.ENUM,
+            original: _resolve_original(node),
+            values
+        };
+        return type_attributes;
+    }
     const node_type_node = (_b = (_a = node_type.aliasSymbol) === null || _a === void 0 ? void 0 : _a.declarations) === null || _b === void 0 ? void 0 : _b[0];
     if (node_type_node) {
         const resolved = _resolve_type_attributes(node_type_node);
