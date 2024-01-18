@@ -512,7 +512,7 @@ function _resolve_type_attributes_for_type_reference(node) {
         let type_attributes = {
             primitive: t.PRIMITIVE.ENUM,
             original: _resolve_original(node),
-            values
+            values,
         };
         return type_attributes;
     }
