@@ -490,6 +490,13 @@ function _resolve_type_attributes_for_type_reference(node) {
     if (!type_reference) {
         return _unknown_type_reference(node);
     }
+    if (type_reference.getText() === 'Date') {
+        let type_attributes = {
+            primitive: t.PRIMITIVE.DATE,
+            original: _resolve_original(node),
+        };
+        return type_attributes;
+    }
     const node_type = checker.getTypeAtLocation(type_reference);
     /*
      * I added this for avoiding infinite loop when defining ENUM as ObjectValue

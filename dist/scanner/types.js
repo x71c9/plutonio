@@ -14,6 +14,7 @@ exports.KIND = {
 };
 exports.PRIMITIVE = {
     ARRAY: 'array',
+    DATE: 'date',
     ENUM: 'enum',
     BOOLEAN: 'boolean',
     NUMBER: 'number',

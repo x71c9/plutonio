@@ -58,6 +58,7 @@ export type TypeAttributes = {
 };
 export declare const PRIMITIVE: {
     ARRAY: string;
+    DATE: string;
     ENUM: string;
     BOOLEAN: string;
     NUMBER: string;

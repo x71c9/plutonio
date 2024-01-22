@@ -77,6 +77,7 @@ export type TypeAttributes = {
 
 export const PRIMITIVE = {
   ARRAY: 'array',
+  DATE: 'date',
   ENUM: 'enum',
   BOOLEAN: 'boolean',
   NUMBER: 'number',
