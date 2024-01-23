@@ -692,6 +692,9 @@ function _resolve_primitive(node: ts.Node): t.Primitive {
   if (_is_intersection(node)) {
     return _resolve_intersection_primitive(node);
   }
+  if (_is_union(node)) {
+    return _resolve_union_primitive(node);
+  }
   if (_node_type_is_enum(node)) {
     return t.PRIMITIVE.ENUM;
   }
@@ -723,6 +726,14 @@ function _resolve_primitive(node: ts.Node): t.Primitive {
     return t.PRIMITIVE.UNKNOWN;
   }
   return t.PRIMITIVE.UNRESOLVED;
+}
+
+function _is_union(node: ts.Node): boolean {
+  const union_type = _get_first_level_child(node, ts.SyntaxKind.UnionType);
+  if (union_type) {
+    return true;
+  }
+  return false;
 }
 
 function _is_intersection(node: ts.Node): boolean {
@@ -876,7 +887,7 @@ function _get_first_level_children<T extends ts.Node>(
   return nodes;
 }
 
-// Method for solving primitive of interecetion type
+// Method for solving primitive of intersecetion type
 // Not clean method
 function _resolve_direct_node_primitive(node: ts.Node): t.Primitive {
   if (ts.isTypeReferenceNode(node)) {
@@ -974,6 +985,25 @@ function _resolve_direct_node_properties(
     properties[property_name] = _resolve_property(property_signature);
   }
   return properties;
+}
+
+function _resolve_union_primitive(node: ts.Node): t.Primitive {
+  const union_type = _get_first_level_child(node, ts.SyntaxKind.UnionType);
+  if (!union_type) {
+    return t.PRIMITIVE.UNRESOLVED;
+  }
+  const type_literals = _get_nested_children(
+    union_type,
+    ts.SyntaxKind.TypeLiteral
+  );
+  const type_references = _get_nested_children(
+    union_type,
+    ts.SyntaxKind.TypeReference
+  );
+  if (type_literals.length > 0 || type_references.length > 0) {
+    return t.PRIMITIVE.UNRESOLVED;
+  }
+  return t.PRIMITIVE.ENUM;
 }
 
 // Method for solving primitive of interecetion type
