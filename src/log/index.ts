@@ -7,4 +7,4 @@
  */
 
 import i0n from 'i0n';
-export const ion = i0n.create({});
+export const log = i0n.create({});

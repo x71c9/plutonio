@@ -39,6 +39,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.scan = void 0;
 const path_1 = __importDefault(require("path"));
 const typescript_1 = __importDefault(require("typescript"));
+// import {log} from '../log/index';
 const utils = __importStar(require("../utils/index"));
 const t = __importStar(require("./types"));
 __exportStar(require("./types"), exports);
@@ -540,6 +541,10 @@ function _resolve_primitive_type_reference(node_type, node) {
 function _resolve_primitive_of_simple_type(node_type) {
     // TODO: Fix
     const primitive = node_type.intrinsicName;
+    if (!primitive) {
+        // log.warn(`'intrinsicName' was undefined. Cannot resolve primitive`);
+        return t.PRIMITIVE.UNRESOLVED;
+    }
     return primitive;
 }
 function _unknown_type_reference(_node) {

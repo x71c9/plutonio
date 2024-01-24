@@ -8,6 +8,7 @@
 
 import path from 'path';
 import ts from 'typescript';
+// import {log} from '../log/index';
 import * as utils from '../utils/index';
 import * as t from './types';
 export * from './types';
@@ -668,6 +669,10 @@ function _resolve_primitive_type_reference(
 function _resolve_primitive_of_simple_type(node_type: ts.Type): t.Primitive {
   // TODO: Fix
   const primitive = (node_type as any).intrinsicName;
+  if (!primitive) {
+    // log.warn(`'intrinsicName' was undefined. Cannot resolve primitive`);
+    return t.PRIMITIVE.UNRESOLVED;
+  }
   return primitive;
 }
 
