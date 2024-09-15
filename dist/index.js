@@ -27,14 +27,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
     __setModuleDefault(result, mod);
     return result;
 };
-var _a, _b, _c;
 Object.defineProperty(exports, "__esModule", { value: true });
 const plutonio = __importStar(require("./main"));
 exports.default = plutonio;
-const base_path = `/Users/x71c9/repos/plutonio/builder`;
-const scanned = plutonio.scan(`${base_path}/tsconfig.json`);
-const imports = (_a = scanned[`${base_path}/src/index.ts`]) === null || _a === void 0 ? void 0 : _a.imports;
-const type = (_c = (_b = scanned[`${base_path}/src/index.ts`]) === null || _b === void 0 ? void 0 : _b.interfaces) === null || _c === void 0 ? void 0 : _c['Something'];
-console.log(JSON.stringify(imports, null, 2));
-console.log(JSON.stringify(type, null, 2));
 //# sourceMappingURL=index.js.map

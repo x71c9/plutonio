@@ -148,7 +148,7 @@ function _resolve_import(import_declaration) {
         text,
         module,
         clause: '',
-        specifiers: []
+        specifiers: [],
     };
     // if (!import_clause) {
     //   throw new Error(`Missing import clause`);
