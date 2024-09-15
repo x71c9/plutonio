@@ -137,17 +137,26 @@ function _resolve_import(import_declaration: ts.ImportDeclaration): t.Import {
     import_declaration,
     ts.SyntaxKind.ImportClause
   ) as ts.ImportClause[];
-  const import_clause = import_clauses[0];
-  if (!import_clause) {
-    throw new Error(`Missing import clause`);
+  if (import_clauses.length > 0) {
+    const import_clause = import_clauses[0]!;
+    const clause = import_clause.getText();
+    return {
+      text,
+      module,
+      clause,
+      specifiers: [],
+    };
   }
-  const clause = import_clause.getText();
+  // i.e.: import './file.js'
   return {
     text,
     module,
-    clause,
+    clause: '',
     specifiers: [],
   };
+  // if (!import_clause) {
+  //   throw new Error(`Missing import clause`);
+  // }
 }
 
 function _resolve_source_file_part(

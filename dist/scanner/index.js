@@ -133,17 +133,26 @@ function _resolve_import(import_declaration) {
     }
     // i.e.: import plutonio from 'plutonio'
     const import_clauses = utils.get_nested_of_type(import_declaration, typescript_1.default.SyntaxKind.ImportClause);
-    const import_clause = import_clauses[0];
-    if (!import_clause) {
-        throw new Error(`Missing import clause`);
+    if (import_clauses.length > 0) {
+        const import_clause = import_clauses[0];
+        const clause = import_clause.getText();
+        return {
+            text,
+            module,
+            clause,
+            specifiers: [],
+        };
     }
-    const clause = import_clause.getText();
+    // i.e.: import './file.js'
     return {
         text,
         module,
-        clause,
-        specifiers: [],
+        clause: '',
+        specifiers: []
     };
+    // if (!import_clause) {
+    //   throw new Error(`Missing import clause`);
+    // }
 }
 function _resolve_source_file_part(source_file, syntax_kind) {
     const nodes = _get_nested_children(source_file, syntax_kind);
