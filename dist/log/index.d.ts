@@ -5,4 +5,4 @@
  * @packageDocumentation
  *
  */
-export declare const log: import("i0n/dist/class").Ion;
+export declare const log: import("i0n/dist/class").ION;

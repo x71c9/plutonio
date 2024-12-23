@@ -43,7 +43,7 @@ const typescript_1 = __importDefault(require("typescript"));
 const utils = __importStar(require("../utils/index"));
 const t = __importStar(require("./types"));
 __exportStar(require("./types"), exports);
-const known_type_reference = ['Array', 'Record'];
+const known_type_reference = ['Array', 'Record', 'Omit', 'Pick'];
 let checker;
 function scan(tsconfig_path) {
     const config_file = typescript_1.default.readConfigFile(tsconfig_path, typescript_1.default.sys.readFile);
@@ -438,9 +438,68 @@ function _node_type_is_array(node) {
     }
     return false;
 }
+function _is_pick_omit_type_reference(type_reference) {
+    if (!type_reference) {
+        return false;
+    }
+    const type_text = type_reference.getText();
+    if (type_text.substring(0, 4) === 'Omit') {
+        return true;
+    }
+    if (type_text.substring(0, 4) === 'Pick') {
+        return true;
+    }
+    return false;
+}
+// function _resolve_omit_properties(node_type: ts.Type) {
+//   const properties = node_type.getProperties();
+//   console.log(properties);
+//   for(const prop of properties){
+//     const original = prop.getText();
+//     const primitive = t.PRIMITIVE.UNKNOWN;
+//   const property = {
+//   original: string;
+//   primitive: Primitive;
+//   item?: TypeAttributes;
+//   values?: Values;
+//   properties?: Properties;
+//   }
+//   }
+// }
+function _infer_primitive(type) {
+    if (type.flags & typescript_1.default.TypeFlags.String)
+        return t.PRIMITIVE.STRING;
+    if (type.flags & typescript_1.default.TypeFlags.Number)
+        return t.PRIMITIVE.NUMBER;
+    if (type.flags & typescript_1.default.TypeFlags.Boolean)
+        return t.PRIMITIVE.BOOLEAN;
+    if (type.flags & typescript_1.default.TypeFlags.Object) {
+        if (type.symbol && type.symbol.name === 'Date')
+            return t.PRIMITIVE.DATE;
+        return t.PRIMITIVE.OBJECT;
+    }
+    return t.PRIMITIVE.UNKNOWN;
+}
 function _resolve_properties(node) {
     if (_is_intersection(node)) {
         return _resolve_intersection_properties(node);
+    }
+    const type_reference = _get_first_level_child(node, typescript_1.default.SyntaxKind.TypeReference);
+    if (_is_pick_omit_type_reference(type_reference)) {
+        const type = checker.getTypeAtLocation(node);
+        const type_properties = type.getProperties();
+        const properties = {};
+        for (let i = 0; i < type_properties.length; i++) {
+            const prop = type_properties[i];
+            const propType = checker.getTypeOfSymbolAtLocation(prop, node);
+            const propTypeString = checker.typeToString(propType);
+            const primitive = _infer_primitive(propType);
+            properties[prop.name] = {
+                original: `${prop.name}: ${propTypeString};`,
+                primitive,
+            };
+        }
+        return properties;
     }
     let properties;
     const property_signatures = _get_property_signatures(node);
@@ -631,7 +690,9 @@ function _node_type_is_object(node) {
     const type_reference = _get_first_level_child(node, typescript_1.default.SyntaxKind.TypeReference);
     if (type_reference) {
         const identifier_name = _get_type_first_identifier_name(type_reference);
-        if (identifier_name === 'Record') {
+        if (identifier_name === 'Record' ||
+            identifier_name === 'Omit' ||
+            identifier_name === 'Pick') {
             return true;
         }
     }
@@ -786,7 +847,7 @@ function _resolve_intersection_properties(node) {
     }
     return properties;
 }
-// Method for solving properties of interecetion type
+// Method for solving properties of intersecetion type
 // Not clean method
 function _resolve_direct_node_properties(node) {
     var _a, _b;
