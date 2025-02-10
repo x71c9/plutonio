@@ -8,7 +8,6 @@
 
 import path from 'path';
 import ts from 'typescript';
-// import {log} from '../log/index';
 import * as utils from '../utils/index';
 import * as t from './types';
 export * from './types';
@@ -170,8 +169,6 @@ function _resolve_source_file_part(
   const scanned_nodes: t.Types | t.Interfaces | t.Enums = {};
   for (const node of nodes) {
     const name = _get_name(node);
-    console.log(`***********************************************************`);
-    console.log(`${name}`);
     scanned_nodes[name] = _resolve_node(node, name);
   }
   if (Object.keys(scanned_nodes).length < 1) {
@@ -208,6 +205,7 @@ function _resolve_type_attributes(node: ts.Node): t.TypeAttributes {
   if (_is_node_custom_type_reference(node)) {
     const type_attributes = _resolve_type_attributes_for_type_reference(node);
     type_attributes.original = _resolve_original(node);
+    type_attributes.optional = _resolve_optional(node);
     return type_attributes;
   }
   let type_attributes: t.TypeAttributes = {
@@ -227,7 +225,7 @@ function _resolve_type_attributes(node: ts.Node): t.TypeAttributes {
   return utils.no_undefined(type_attributes);
 }
 
-function _resolve_optional(attribute: ts.Node): boolean {
+function _resolve_optional(attribute: ts.Node): true | undefined {
   if (ts.isPropertySignature(attribute) || ts.isParameter(attribute)) {
     // Check if the property has a question mark (?)
     if (attribute.questionToken) {
@@ -237,11 +235,14 @@ function _resolve_optional(attribute: ts.Node): boolean {
     const type = checker.getTypeAtLocation(attribute);
     // Check if the type includes `undefined`
     if (type.isUnion()) {
-      return type.types.some((t) => (t.flags & ts.TypeFlags.Undefined) !== 0);
+      return (
+        type.types.some((t) => (t.flags & ts.TypeFlags.Undefined) !== 0) ||
+        undefined
+      );
     }
-    return (type.flags & ts.TypeFlags.Undefined) !== 0;
+    return (type.flags & ts.TypeFlags.Undefined) !== 0 || undefined;
   }
-  return false;
+  return undefined;
 }
 
 function _merge_type_attributes(
@@ -601,7 +602,6 @@ function _resolve_properties(node: ts.Node): t.Properties | undefined {
   if (_is_intersection(node)) {
     return _resolve_intersection_properties(node);
   }
-
   const type_reference = _get_first_level_child(
     node,
     ts.SyntaxKind.TypeReference
@@ -617,12 +617,13 @@ function _resolve_properties(node: ts.Node): t.Properties | undefined {
       const primitive = _infer_primitive(propType);
       properties[prop.name] = {
         original: `${prop.name}: ${propTypeString};`,
+        optional: _resolve_optional(node),
+
         primitive,
       };
     }
     return properties;
   }
-
   let properties: t.Properties | undefined;
   const property_signatures = _get_property_signatures(node);
   for (const property_signature of property_signatures) {
@@ -631,6 +632,7 @@ function _resolve_properties(node: ts.Node): t.Properties | undefined {
       const property_attributes =
         _resolve_type_attributes_for_type_reference(property_signature);
       property_attributes.original = _resolve_original(property_signature);
+      property_attributes.optional = _resolve_optional(property_signature);
       if (!properties) {
         properties = {};
       }
@@ -690,8 +692,6 @@ function _resolve_property(property: ts.PropertySignature): t.TypeAttributes {
     properties: _resolve_properties(property),
     optional: _resolve_optional(property),
   };
-  console.log(type_attribute.original);
-  console.log('++++++++++++++++++++++++++++++++++++++++++++++++++');
   return utils.no_undefined(type_attribute);
 }
 
@@ -709,6 +709,7 @@ function _resolve_type_attributes_for_type_reference(
     let type_attributes: t.TypeAttributes = {
       primitive: t.PRIMITIVE.DATE,
       original: _resolve_original(node),
+      optional: _resolve_optional(node),
     };
     return type_attributes;
   }
@@ -728,7 +729,6 @@ function _resolve_type_attributes_for_type_reference(
    * VideoCategory in this case is a Union:
    */
   if (node_type.isUnion()) {
-    console.log(`IS UNION`);
     const values: t.Values = [];
     for (let single_type of node_type.types) {
       values.push((single_type as any).value);
@@ -736,6 +736,7 @@ function _resolve_type_attributes_for_type_reference(
     let type_attributes: t.TypeAttributes = {
       primitive: t.PRIMITIVE.ENUM,
       original: _resolve_original(node),
+      optional: _resolve_optional(node),
       values,
     };
     return type_attributes;
@@ -756,6 +757,7 @@ function _resolve_primitive_type_reference(
 ): t.TypeAttributes {
   const type_attribute: t.TypeAttributes = {
     original: _resolve_original(node),
+    optional: _resolve_optional(node),
     primitive: _resolve_primitive_of_simple_type(node_type),
   };
   return utils.no_undefined(type_attribute);
@@ -771,10 +773,11 @@ function _resolve_primitive_of_simple_type(node_type: ts.Type): t.Primitive {
   return primitive;
 }
 
-function _unknown_type_reference(_node: ts.Node): t.TypeAttributes {
+function _unknown_type_reference(node: ts.Node): t.TypeAttributes {
   const type_attribute: t.TypeAttributes = {
     // original: _resolve_original(node),
     original: '',
+    optional: _resolve_optional(node),
     primitive: t.PRIMITIVE.UNKNOWN,
   };
   return utils.no_undefined(type_attribute);
@@ -1083,6 +1086,7 @@ function _resolve_direct_node_properties(
       const property_attributes =
         _resolve_type_attributes_for_type_reference(property_signature);
       property_attributes.original = _resolve_original(property_signature);
+      property_attributes.optional = _resolve_optional(property_signature);
       properties[property_name] = property_attributes;
       continue;
     }
