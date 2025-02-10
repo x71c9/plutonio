@@ -70,6 +70,7 @@ export type Properties = {
 export type TypeAttributes = {
   original: string;
   primitive: Primitive;
+  optional?: boolean;
   item?: TypeAttributes;
   values?: Values;
   properties?: Properties;

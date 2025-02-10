@@ -159,6 +159,8 @@ function _resolve_source_file_part(source_file, syntax_kind) {
     const scanned_nodes = {};
     for (const node of nodes) {
         const name = _get_name(node);
+        console.log(`***********************************************************`);
+        console.log(`${name}`);
         scanned_nodes[name] = _resolve_node(node, name);
     }
     if (Object.keys(scanned_nodes).length < 1) {
@@ -206,6 +208,22 @@ function _resolve_type_attributes(node) {
         type_attributes = _merge_type_attributes(type_attributes, ...extended_type_attributes);
     }
     return utils.no_undefined(type_attributes);
+}
+function _resolve_optional(attribute) {
+    if (typescript_1.default.isPropertySignature(attribute) || typescript_1.default.isParameter(attribute)) {
+        // Check if the property has a question mark (?)
+        if (attribute.questionToken) {
+            return true;
+        }
+        // Get the type of the property
+        const type = checker.getTypeAtLocation(attribute);
+        // Check if the type includes `undefined`
+        if (type.isUnion()) {
+            return type.types.some((t) => (t.flags & typescript_1.default.TypeFlags.Undefined) !== 0);
+        }
+        return (type.flags & typescript_1.default.TypeFlags.Undefined) !== 0;
+    }
+    return false;
 }
 function _merge_type_attributes(...type_attributes) {
     const main_type_attributues = type_attributes[0];
@@ -550,7 +568,10 @@ function _resolve_property(property) {
         primitive: _resolve_primitive(property),
         values: _resolve_values(property),
         properties: _resolve_properties(property),
+        optional: _resolve_optional(property),
     };
+    console.log(type_attribute.original);
+    console.log('++++++++++++++++++++++++++++++++++++++++++++++++++');
     return utils.no_undefined(type_attribute);
 }
 function _resolve_type_attributes_for_type_reference(node) {
@@ -581,6 +602,7 @@ function _resolve_type_attributes_for_type_reference(node) {
      * VideoCategory in this case is a Union:
      */
     if (node_type.isUnion()) {
+        console.log(`IS UNION`);
         const values = [];
         for (let single_type of node_type.types) {
             values.push(single_type.value);
@@ -886,13 +908,51 @@ function _resolve_union_primitive(node) {
     if (!union_type) {
         return t.PRIMITIVE.UNRESOLVED;
     }
-    const type_literals = _get_nested_children(union_type, typescript_1.default.SyntaxKind.TypeLiteral);
-    const type_references = _get_nested_children(union_type, typescript_1.default.SyntaxKind.TypeReference);
-    if (type_literals.length > 0 || type_references.length > 0) {
-        return t.PRIMITIVE.UNRESOLVED;
+    const unionTypeNode = union_type;
+    let hasNonLiteralOrPrimitive = false;
+    let hasLiteral = false;
+    for (const type of unionTypeNode.types) {
+        if (type.kind === typescript_1.default.SyntaxKind.UndefinedKeyword) {
+            // Ignore undefined
+            continue;
+        }
+        else if (typescript_1.default.isLiteralTypeNode(type)) {
+            hasLiteral = true;
+        }
+        else if (type.kind === typescript_1.default.SyntaxKind.StringKeyword ||
+            type.kind === typescript_1.default.SyntaxKind.NumberKeyword ||
+            type.kind === typescript_1.default.SyntaxKind.BooleanKeyword) {
+            // If it contains `string`, `number`, or `boolean`, it is NOT an enum
+            hasNonLiteralOrPrimitive = true;
+        }
+        else {
+            hasNonLiteralOrPrimitive = true;
+        }
     }
-    return t.PRIMITIVE.ENUM;
+    // A real enum is a union of only literals (excluding undefined)
+    if (hasLiteral && !hasNonLiteralOrPrimitive) {
+        return t.PRIMITIVE.ENUM;
+    }
+    return t.PRIMITIVE.UNRESOLVED;
 }
+// function _resolve_union_primitive(node: ts.Node): t.Primitive {
+//   const union_type = _get_first_level_child(node, ts.SyntaxKind.UnionType);
+//   if (!union_type) {
+//     return t.PRIMITIVE.UNRESOLVED;
+//   }
+//   const type_literals = _get_nested_children(
+//     union_type,
+//     ts.SyntaxKind.TypeLiteral
+//   );
+//   const type_references = _get_nested_children(
+//     union_type,
+//     ts.SyntaxKind.TypeReference
+//   );
+//   if (type_literals.length > 0 || type_references.length > 0) {
+//     return t.PRIMITIVE.UNRESOLVED;
+//   }
+//   return t.PRIMITIVE.ENUM;
+// }
 // Method for solving primitive of interecetion type
 // Not clean method
 function _resolve_intersection_primitive(node) {
