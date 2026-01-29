@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 if [[ `git status --porcelain` ]]; then
   echo
