@@ -1,5 +1,7 @@
 #!/bin/sh
 
+SEMANTIC_NAME=$1
+
 if [[ `git status --porcelain` ]]; then
   echo
   echo "Error: Git working directory is not clean. Please commit your changes or stash them."
@@ -7,7 +9,27 @@ if [[ `git status --porcelain` ]]; then
   exit 1
 fi;
 
-SEMANTIC_NAME=$1
+# Check if logged in to npm
+echo "Checking npm login status..."
+if ! npm whoami --loglevel=error > /dev/null 2>&1; then
+  echo
+  echo "You are not logged in to npm."
+  echo "Please log in to continue."
+  echo
+  npm login
+  if ! npm whoami --loglevel=error > /dev/null 2>&1; then
+    echo
+    echo "Error: npm login failed. Aborting."
+    echo
+    exit 1
+  fi
+  echo
+  echo "Successfully logged in to npm as: $(npm whoami)"
+  echo
+else
+  echo "Already logged in to npm as: $(npm whoami --loglevel=error)"
+  echo
+fi
 
 if [ "$SEMANTIC_NAME" == "" ]; then
   echo
@@ -19,7 +41,7 @@ fi
 
 case "$SEMANTIC_NAME" in
   patch)
-    npm version patch
+    npm version patch --loglevel=error
     break;
     ;;
   minor)
@@ -31,7 +53,7 @@ case "$SEMANTIC_NAME" in
         * ) echo "Please answer [y]es or [n]o.";;
       esac
     done
-    npm version minor
+    npm version minor --loglevel=error
     break;
     ;;
   major)
@@ -43,7 +65,7 @@ case "$SEMANTIC_NAME" in
         * ) echo "Please answer [y]es or [n]o.";;
       esac
     done
-    npm version major
+    npm version major --loglevel=error
     break;
     ;;
   *)
@@ -55,7 +77,6 @@ case "$SEMANTIC_NAME" in
     ;;
 esac
 
+yarn publish --new-version $(node -p "require('./package.json').version")
 git push origin
-VERSION=$(node -p "require('./package.json').version")
-git push origin v$VERSION
-yarn publish --new-version $VERSION
+git push origin v$(node -p "require('./package.json').version")
