@@ -77,6 +77,6 @@ case "$SEMANTIC_NAME" in
     ;;
 esac
 
-yarn publish --new-version $(node -p "require('./package.json').version")
+npm publish --new-version $(node -p "require('./package.json').version")
 git push origin
 git push origin v$(node -p "require('./package.json').version")
