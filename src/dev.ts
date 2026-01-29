@@ -7,7 +7,7 @@
 import * as plutonio from './main';
 export default plutonio;
 
-const base_path = `/Users/x71c9/repos/plutonio/builder`;
+const base_path = `./adiacenti/builder`;
 const scanned = plutonio.scan(`${base_path}/tsconfig.json`);
 // const imports = scanned[`${base_path}/src/index.ts`]?.imports;
 // const type = scanned[`${base_path}/src/index.ts`]?.interfaces?.['Something'];

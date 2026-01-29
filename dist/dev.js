@@ -30,7 +30,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const plutonio = __importStar(require("./main"));
 exports.default = plutonio;
-const base_path = `/Users/x71c9/repos/plutonio/builder`;
+const base_path = `./adiacenti/builder`;
 const scanned = plutonio.scan(`${base_path}/tsconfig.json`);
 // const imports = scanned[`${base_path}/src/index.ts`]?.imports;
 // const type = scanned[`${base_path}/src/index.ts`]?.interfaces?.['Something'];

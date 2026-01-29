@@ -1,5 +1,4 @@
 node_modules/
-.DS_Store
 Thumbs.db
 *.swp
 *.swo
@@ -9,4 +8,7 @@ yarn-error.log
 .serverless
 reports/
 coverage/
+.DS_Store
 src/index.ts_
+adiacenti
+.direnv
